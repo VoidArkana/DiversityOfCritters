@@ -2,5 +2,8 @@
   "creativetab.docentities_tab" : "DOC: Entity",
 
   "entity.diversityofcritters.lion" : "Lion",
-  "item.diversityofcritters.lion_spawn_egg" : "Lion Spawn Egg"
+  "item.diversityofcritters.lion_spawn_egg" : "Lion Spawn Egg",
+
+  "entity.diversityofcritters.civet" : "Banded Palm Civet",
+  "item.diversityofcritters.civet_spawn_egg" : "Banded Palm Civet Spawn Egg"
 }

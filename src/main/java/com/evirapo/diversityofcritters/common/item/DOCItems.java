@@ -16,6 +16,9 @@ public class DOCItems {
     public static final RegistryObject<Item> LION_SPAWN_EGG = ITEM_TYPES.register("lion_spawn_egg",
             ()-> new ForgeSpawnEggItem(DOCEntities.LION, 0xffffff, 0xffffff, new Item.Properties()));
 
+    public static final RegistryObject<Item> CIVET_SPAWN_EGG = ITEM_TYPES.register("civet_spawn_egg",
+            ()-> new ForgeSpawnEggItem(DOCEntities.CIVET, 0xffffff, 0xffffff, new Item.Properties()));
+
     public static final RegistryObject<Item> ENTITY_TAB_ICON = ITEM_TYPES.register("entity_tab_icon",
             ()-> new Item(new Item.Properties()));
 

@@ -14,12 +14,13 @@ public class DOCEntitiesCreativeTab {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, DiversityOfCritters.MODID);
 
-    public static final RegistryObject<CreativeModeTab> MARVELOUS_MENAGERIE_TAB =
+    public static final RegistryObject<CreativeModeTab> DOC_TAB =
             CREATIVE_MODE_TABS.register("docentities_tab", ()-> CreativeModeTab.builder().icon(() -> new ItemStack(DOCItems.ENTITY_TAB_ICON.get()))
                     .title(Component.translatable("creativetab.docentities_tab"))
                     .displayItems((itemDisplayParameters, output) -> {
 
-                        output.accept(DOCItems.LION_SPAWN_EGG.get());
+                        //output.accept(DOCItems.LION_SPAWN_EGG.get());
+                        output.accept(DOCItems.CIVET_SPAWN_EGG.get());
 
                     })
                     .build());
