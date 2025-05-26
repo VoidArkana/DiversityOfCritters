@@ -1,20 +1,34 @@
 package com.evirapo.diversityofcritters.common.entity.custom.base;
 
+import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
+import com.evirapo.diversityofcritters.common.item.DOCItems;
+import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
+import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.*;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.control.LookControl;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.pathfinder.BlockPathTypes;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.event.entity.player.PlayerContainerEvent;
+import net.minecraftforge.items.wrapper.InvWrapper;
+import net.minecraftforge.network.PacketDistributor;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 
-public abstract class DiverseCritter extends Animal {
+public abstract class DiverseCritter extends Animal implements ContainerListener {
 
     private static final EntityDataAccessor<Boolean> IS_MALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
@@ -28,11 +42,11 @@ public abstract class DiverseCritter extends Animal {
 
     protected DiverseCritter(EntityType<? extends Animal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
+        this.createInventory();
         this.lookControl = new CritterLookControl();
         this.moveControl = new DiverseCritter.CritterMoveControl();
         this.setPathfindingMalus(BlockPathTypes.WATER_BORDER, 0.0F);
     }
-
     public int maxHunger(){
         return 100;
     }
@@ -73,6 +87,14 @@ public abstract class DiverseCritter extends Animal {
 
     public void setIsMale(Boolean isMale) {
         this.entityData.set(IS_MALE, isMale);
+    }
+
+    public int getHungerPercentage() {
+        return (100 * this.getHunger())/this.maxHunger();
+    }
+
+    public int getThirstPercentage() {
+        return (100 * this.getThirst())/this.maxThirst();
     }
 
     public int getHunger() {
@@ -196,6 +218,59 @@ public abstract class DiverseCritter extends Animal {
 
     public boolean isHungry(){
         return this.getHunger() < (this.maxHunger()/2);
+    }
+
+    private boolean inventoryOpen;
+    private DiverseInventory inventory;
+
+    private void createInventory() {
+        SimpleContainer simplecontainer = this.getInventory();
+        this.inventory = new DiverseInventory(this);
+        if (simplecontainer != null) {
+            simplecontainer.removeListener(this);
+        }
+
+        this.getInventory().addListener(this);
+    }
+
+    public void openGUI(Player player) {
+        if (!this.level().isClientSide()) {
+            ServerPlayer sp = (ServerPlayer) player;
+            if (sp.containerMenu != sp.inventoryMenu) {
+                sp.closeContainer();
+            }
+
+            sp.nextContainerCounter();
+            DOCNetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), new OpenStatsScreenPacket(sp.containerCounter, this.getId()));
+            sp.containerMenu = new DOCStatsMenu(sp.containerCounter, this.getInventory(), sp.getInventory());
+            sp.initMenu(sp.containerMenu);
+            this.inventoryOpen = true;
+            MinecraftForge.EVENT_BUS.post(new PlayerContainerEvent.Open(sp, sp.containerMenu));
+        }
+    }
+
+    @Nullable
+    public SimpleContainer getInventory() {
+        return this.inventory;
+    }
+
+    public void closeInventory() {
+        this.inventoryOpen = false;
+    }
+
+    @Override
+    public void containerChanged(Container pContainer) {}
+
+    @Override
+    public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
+        ItemStack itemstack = pPlayer.getItemInHand(pHand);
+
+        if(itemstack.is(DOCItems.ZOO_BOOK.get())){
+            this.openGUI(pPlayer);
+            return InteractionResult.SUCCESS;
+        }
+
+        return super.mobInteract(pPlayer, pHand);
     }
 
 }

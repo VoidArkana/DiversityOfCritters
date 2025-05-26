@@ -1,8 +1,10 @@
 package com.evirapo.diversityofcritters;
 
+import com.evirapo.diversityofcritters.client.menu.DOCMenuTypes;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.misc.creative.DOCEntitiesCreativeTab;
+import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
@@ -26,10 +28,11 @@ public class DiversityOfCritters
     {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        //modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::commonSetup);
 
         DOCItems.register(modEventBus);
         DOCEntities.register(modEventBus);
+        DOCMenuTypes.register(modEventBus);
         DOCEntitiesCreativeTab.register(modEventBus);
 
         MinecraftForge.EVENT_BUS.register(this);
@@ -37,11 +40,11 @@ public class DiversityOfCritters
         //modEventBus.addListener(this::addCreative);
     }
 
-//    private void commonSetup(final FMLCommonSetupEvent event)
-//    {
-//
-//    }
-//
+    private void commonSetup(final FMLCommonSetupEvent event)
+    {
+        DOCNetworkHandler.init();
+    }
+
 //    private void addCreative(BuildCreativeModeTabContentsEvent event)
 //    {
 //

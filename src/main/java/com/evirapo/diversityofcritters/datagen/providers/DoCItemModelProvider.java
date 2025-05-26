@@ -21,6 +21,7 @@ public class DoCItemModelProvider extends ItemModelProvider {
     @Override
     protected void registerModels() {
         simpleItem(DOCItems.CIVET_SPAWN_EGG);
+        simpleItem(DOCItems.ZOO_BOOK);
     }
 
     private ItemModelBuilder simpleItem(RegistryObject<Item> item){
