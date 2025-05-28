@@ -20,9 +20,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.pathfinder.BlockPathTypes;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.event.entity.player.PlayerContainerEvent;
-import net.minecraftforge.items.wrapper.InvWrapper;
 import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
@@ -113,7 +111,7 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
         this.entityData.set(THIRST, hunger);
     }
 
-    public Boolean getIsDrinking() {
+    public Boolean IsDrinking() {
         return this.entityData.get(DRINKING);
     }
 
@@ -168,7 +166,7 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
             this.setThirst(prevThirst-1);
         }
 
-        if (this.getHunger() <= 0 && this.getThirst() <= 0 && random.nextFloat() <= 0.07){
+        if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){
             this.starve();
         }
 

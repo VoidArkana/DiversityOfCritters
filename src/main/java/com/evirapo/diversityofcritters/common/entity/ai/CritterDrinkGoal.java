@@ -3,7 +3,6 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
@@ -54,7 +53,7 @@ public class CritterDrinkGoal extends Goal {
     public void tick() {
         if (targetPos != null && waterPos != null) {
             double dist = this.critter.distanceToSqr(Vec3.atCenterOf(waterPos));
-            if (dist > 2 && this.critter.getIsDrinking()) {
+            if (dist > 2 && this.critter.IsDrinking()) {
                 this.critter.setIsDrinking(false);
             }
             if (dist <= 1F) {

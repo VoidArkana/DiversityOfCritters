@@ -110,10 +110,13 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		if (entity.isInWaterOrBubble()){
 			this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
 		}else {
-			this.animateWalk(CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+			this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
 
 			this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
 		}
+
+		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
+		this.animate(entity.attackAnimationState, CivetAnims.ATTACK, ageInTicks, 1.0F);
 
 		if (this.young){
 			this.applyStatic(CivetAnims.BABY);

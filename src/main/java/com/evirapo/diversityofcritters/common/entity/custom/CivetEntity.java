@@ -1,15 +1,20 @@
 package com.evirapo.diversityofcritters.common.entity.custom;
 
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
+import com.evirapo.diversityofcritters.common.entity.ai.AnimatedAttackGoal;
 import com.evirapo.diversityofcritters.common.entity.ai.CritterDrinkGoal;
 import com.evirapo.diversityofcritters.common.entity.ai.CustomFloatGoal;
 import com.evirapo.diversityofcritters.common.entity.ai.LookForFoodItems;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.entity.custom.base.IAnimatedAttacker;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -36,12 +41,19 @@ import net.minecraftforge.fluids.FluidType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
 
-public class CivetEntity extends DiverseCritter {
+public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
     public final AnimationState idleAnimationState = new AnimationState();
+    public final AnimationState drinkingAnimationState = new AnimationState();
     private LookForFoodItems forFoodGoal;
+
+    private static final EntityDataAccessor<Boolean> IS_ATTACKING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
+
+    public int attackAnimationTimeout;
+    public final AnimationState attackAnimationState = new AnimationState();
 
     public CivetEntity(EntityType<? extends Animal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
@@ -58,10 +70,9 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
         this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
         this.goalSelector.addGoal(2, new CritterDrinkGoal(this));
-        this.goalSelector.addGoal(3, new MeleeAttackGoal(this, 1.0D, true));
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.25D, Ingredient.of(Items.BEEF, Items.COOKED_BEEF), false));
-        this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.25D));
-        this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.25D));
+        this.goalSelector.addGoal(1, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
+        this.goalSelector.addGoal(3, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF, Items.COOKED_BEEF), false));
+        this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.15D));
         this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0D));
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
@@ -100,6 +111,10 @@ public class CivetEntity extends DiverseCritter {
                 .add(Attributes.ATTACK_DAMAGE, 2.0D);
     }
 
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(IS_ATTACKING, false);
+    }
 
     @Override
     public void jumpInFluid(FluidType type) {
@@ -150,7 +165,7 @@ public class CivetEntity extends DiverseCritter {
     public void tick() {
         super.tick();
 
-        if (getIsDrinking()) {
+        if (IsDrinking()) {
             if (getDrinkPos() != null) {
                 BlockPos washingPos = getDrinkPos();
                 if (this.distanceToSqr(washingPos.getX() + 0.5D, washingPos.getY() + 0.5D, washingPos.getZ() + 0.5D) < 3) {
@@ -181,14 +196,40 @@ public class CivetEntity extends DiverseCritter {
         }
     }
 
+    public void customServerAiStep() {
+        if (this.getMoveControl().hasWanted()) {
+            double d0 = this.getMoveControl().getSpeedModifier();
+            this.setPose(Pose.STANDING);
+            this.setSprinting(d0 >= 1.25D);
+        } else {
+            this.setPose(Pose.STANDING);
+            this.setSprinting(false);
+        }
+
+    }
 
     private void setupAnimationStates() {
         this.idleAnimationState.animateWhen(this.isAlive(), this.tickCount);
+        this.drinkingAnimationState.animateWhen(this.isAlive() && this.IsDrinking(), this.tickCount);
+
+
+        if(this.isAttacking() && attackAnimationTimeout <= 0) {
+            attackAnimationTimeout = 10;
+            attackAnimationState.start(this.tickCount);
+        } else {
+            --this.attackAnimationTimeout;
+        }
     }
 
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor pLevel, DifficultyInstance pDifficulty, MobSpawnType pReason, @Nullable SpawnGroupData pSpawnData, @Nullable CompoundTag pDataTag) {
         this.setIsMale(this.random.nextBoolean());
+        if (pReason == MobSpawnType.COMMAND && pDataTag == null){
+            if (this.getHunger() == 0 && this.getThirst() == 0){
+                this.setHunger(this.maxHunger());
+                this.setThirst(this.maxThirst());
+            }
+        }
         return super.finalizeSpawn(pLevel, pDifficulty, pReason, pSpawnData, pDataTag);
     }
 
@@ -214,5 +255,25 @@ public class CivetEntity extends DiverseCritter {
     @Override
     public int maxThirst() {
         return 20*60*100;
+    }
+
+    @Override
+    public boolean isAttacking() {
+        return this.entityData.get(IS_ATTACKING);
+    }
+
+    @Override
+    public void setAttacking(boolean pFromBucket) {
+        this.entityData.set(IS_ATTACKING, pFromBucket);
+    }
+
+    @Override
+    public int attackAnimationTimeout() {
+        return this.attackAnimationTimeout;
+    }
+
+    @Override
+    public void setAttackAnimationTimeout(int attackAnimationTimeout) {
+        this.attackAnimationTimeout = attackAnimationTimeout;
     }
 }
