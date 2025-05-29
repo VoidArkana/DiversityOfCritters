@@ -2,10 +2,13 @@ package com.evirapo.diversityofcritters;
 
 import com.evirapo.diversityofcritters.client.menu.DOCMenuTypes;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
+import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.misc.creative.DOCEntitiesCreativeTab;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.mojang.logging.LogUtils;
+import net.minecraft.world.entity.SpawnPlacements;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
@@ -43,6 +46,9 @@ public class DiversityOfCritters
     private void commonSetup(final FMLCommonSetupEvent event)
     {
         DOCNetworkHandler.init();
+
+        SpawnPlacements.register(DOCEntities.CIVET.get(), SpawnPlacements.Type.ON_GROUND, Heightmap.Types.MOTION_BLOCKING, CivetEntity::checkCivetSpawnRules);
+
     }
 
 //    private void addCreative(BuildCreativeModeTabContentsEvent event)

@@ -1,0 +1,11 @@
+{
+  "type": "forge:add_spawns",
+  "biomes": "#diversityofcritters:is_civet_biome",
+  "spawners": {
+    "type": "diversityofcritters:civet",
+    "weight": 6,
+    "minCount": 2,
+    "maxCount": 4,
+    "category": "creature"
+  }
+}

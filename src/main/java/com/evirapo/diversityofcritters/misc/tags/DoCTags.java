@@ -18,4 +18,13 @@ public class DoCTags {
         }
     }
 
+    public static class Biomes {
+
+        public static final TagKey<Biome> CIVET_BIOMES = create("is_civet_biome");
+
+        private static TagKey<Biome> create(String pName) {
+            return TagKey.create(Registries.BIOME, new ResourceLocation(DiversityOfCritters.MODID, pName));
+        }
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.datagen.providers;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.tags.BiomeTagsProvider;
@@ -22,5 +23,6 @@ public class DoCBiomeTagGenerator extends BiomeTagsProvider {
     }
 
     protected void addTags() {
+        this.tag(DoCTags.Biomes.CIVET_BIOMES).addTags(BiomeTags.IS_JUNGLE);
     }
 }
