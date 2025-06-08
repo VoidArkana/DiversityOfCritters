@@ -98,12 +98,12 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
     @Override
     public boolean canPickUpLoot() {
-        return this.isHungry();
+        return true;
     }
 
     @Override
     public boolean canAttack(LivingEntity pTarget) {
-        return super.canAttack(pTarget) && (this.getLastHurtByMob() != null && this.getLastHurtByMob() == pTarget || this.isHungry());
+        return super.canAttack(pTarget) && ((this.getLastHurtByMob() != null && this.getLastHurtByMob() == pTarget) || this.isHungry());
     }
 
     //attributes
@@ -133,7 +133,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     public void aiStep() {
 
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
-        if (stack != null && stack.is(DoCTags.Items.CIVET_FOOD) && this.isHungry()) {
+
+        if (stack != null && stack.is(DoCTags.Items.CIVET_FOOD)) {
             this.setHunger(Math.min(this.getHunger()+this.maxHunger()/4, this.maxHunger()));
             this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), (double)0.0F, (double)0.0F, (double)0.0F);
             this.level().playSound(null, new BlockPos((int) this.getX(), (int) this.getY(), (int) this.getZ()), SoundEvents.GENERIC_EAT, SoundSource.AMBIENT);
@@ -252,7 +253,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
     @Override
     public int maxHunger() {
-        return 20*60*100;//1 second, 1 minute, 100 minutes, 1% per minute
+        //return 20*60*100;//1 second, 1 minute, 100 minutes, 1% per minute
+        return 20*30;
     }
 
     @Override
@@ -283,4 +285,5 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> pOcelot, LevelAccessor pLevel, MobSpawnType pSpawnType, BlockPos pPos, RandomSource pRandom) {
         return pRandom.nextInt(3) != 0;
     }
+
 }

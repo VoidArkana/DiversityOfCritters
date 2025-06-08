@@ -215,7 +215,7 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
     }
 
     public boolean isHungry(){
-        return this.getHunger() < (this.maxHunger()/2);
+        return this.getHunger() <= (this.maxHunger()/2);
     }
 
     private boolean inventoryOpen;

@@ -42,6 +42,7 @@ public class AnimatedAttackGoal extends MeleeAttackGoal {
                 this.mob.getLookControl().setLookAt(pEnemy.getX(), pEnemy.getEyeY(), pEnemy.getZ());
                 performAttack(pEnemy);
             }
+
         } else {
             resetAttackCooldown();
             shouldCountTillNextAttack = false;
@@ -94,5 +95,9 @@ public class AnimatedAttackGoal extends MeleeAttackGoal {
         if (entity instanceof IAnimatedAttacker attacker)
             attacker.setAttacking(false);
         super.stop();
+    }
+
+    protected double getAttackReachSqr(LivingEntity pAttackTarget) {
+        return (double)(this.mob.getBbWidth() * 1.25F * this.mob.getBbWidth() * 1.25F + pAttackTarget.getBbWidth());
     }
 }
