@@ -6,6 +6,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
 
 public class DoCTags {
 
@@ -15,6 +16,15 @@ public class DoCTags {
 
         private static TagKey<Item> create(String pName) {
             return TagKey.create(Registries.ITEM, new ResourceLocation(DiversityOfCritters.MODID, pName));
+        }
+    }
+
+    public static class Blocks {
+
+        public static final TagKey<Block> CIVET_CLIMBABLE = create("civet_climbable");
+
+        private static TagKey<Block> create(String pName) {
+            return TagKey.create(Registries.BLOCK, new ResourceLocation(DiversityOfCritters.MODID, pName));
         }
     }
 

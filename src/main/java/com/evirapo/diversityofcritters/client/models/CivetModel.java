@@ -6,12 +6,18 @@ import com.evirapo.diversityofcritters.client.animations.CivetAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
+import net.minecraft.client.animation.AnimationDefinition;
+import net.minecraft.client.animation.KeyframeAnimations;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
+import net.minecraft.world.entity.AnimationState;
+import org.joml.Vector3f;
 
 public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
+	private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
 
 	private final ModelPart BandedPlamCivet;
 	private final ModelPart Body;
@@ -31,6 +37,8 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	private final ModelPart Leg;
 	private final ModelPart Leg2;
 	private final ModelPart Leg3;
+
+	public boolean climbing = false;
 
 	public CivetModel(ModelPart root) {
 		this.BandedPlamCivet = root.getChild("BandedPlamCivet");
@@ -107,12 +115,21 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.Head.xRot = headPitch * ((float)Math.PI / 180F);
 		this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
 
-		if (entity.isInWaterOrBubble()){
-			this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
-		}else {
-			this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+		this.climbing = entity.isClimbing();
 
-			this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
+		if (entity.isClimbing()){
+			this.animate(entity.idleAnimationState, CivetAnims.CLIMBING_UP, ageInTicks, 1.0F);
+
+			if (entity.isClimbingUp())
+				this.animateWalk(CivetAnims.CLIMBING_UP, 1, Math.max(0, 1-entity.getTicksClimbing()/3f), 2.0f, 2.5f);
+		}else {
+			if (entity.isInWaterOrBubble()){
+				this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
+			}else {
+				this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+
+				this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
+			}
 		}
 
 		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
@@ -121,7 +138,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		if (this.young){
 			this.applyStatic(CivetAnims.BABY);
 		}
-
 	}
 
 	@Override
@@ -134,7 +150,11 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		}else {
 			poseStack.scale(0.4f, 0.4f, 0.4f);
 			poseStack.translate(0, 2.25, 0);
+		}
 
+		if (this.climbing){
+			poseStack.mulPose(Axis.XP.rotationDegrees(-90));
+			poseStack.translate(0, -0.4f, 0.25f);
 		}
 
 		BandedPlamCivet.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);

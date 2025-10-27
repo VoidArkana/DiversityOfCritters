@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.datagen.providers;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
@@ -21,6 +22,9 @@ public class DoCBlockTagGenerator extends BlockTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider provider) {
-
+        this.tag(DoCTags.Blocks.CIVET_CLIMBABLE)
+                .addTag(BlockTags.DIRT)
+                .addTag(BlockTags.LOGS)
+                .addTag(BlockTags.STONE_ORE_REPLACEABLES);
     }
 }
