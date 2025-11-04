@@ -1,0 +1,7 @@
+package com.evirapo.diversityofcritters.common.entity.util;
+
+import net.minecraft.world.entity.LivingEntity;
+
+public interface ISleepThreatEvaluator  {
+    boolean shouldInterruptSleepDueTo(LivingEntity nearby);
+}

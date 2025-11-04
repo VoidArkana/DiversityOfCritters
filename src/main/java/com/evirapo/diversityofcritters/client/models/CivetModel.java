@@ -1,19 +1,14 @@
-package com.evirapo.diversityofcritters.client.models;// Made with Blockbench 4.12.4
-// Exported for Minecraft version 1.17 or later with Mojang mappings
-// Paste this class into your mod and generate all required imports
+package com.evirapo.diversityofcritters.client.models;
 
 import com.evirapo.diversityofcritters.client.animations.CivetAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
-import net.minecraft.client.animation.AnimationDefinition;
-import net.minecraft.client.animation.KeyframeAnimations;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
-import net.minecraft.world.entity.AnimationState;
 import org.joml.Vector3f;
 
 public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
@@ -112,33 +107,59 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	public void setupAnim(CivetEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
 		this.root().getAllParts().forEach(ModelPart::resetPose);
 
+		boolean sleepingLike = entity.isPreparingSleep() || entity.isSleeping() || entity.isAwakeing();
+
+		this.animate(entity.preparingSleepState, CivetAnims.PREPARING_SLEEP, ageInTicks, 1f);
+		this.animate(entity.sleepState,          CivetAnims.SLEEP,          ageInTicks, 1f);
+		this.animate(entity.awakeningState,      CivetAnims.AWAKENING,      ageInTicks, 1f);
+
 		this.Head.xRot = headPitch * ((float)Math.PI / 180F);
 		this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
+
+		if (sleepingLike) {
+			limbSwing = 0f;
+			limbSwingAmount = 0f;
+			this.climbing = false;
+			this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
+			this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
+			return;
+		}
 
 		this.climbing = entity.isClimbing();
 
 		if (entity.isClimbing()){
 			this.animate(entity.idleAnimationState, CivetAnims.CLIMBING_UP, ageInTicks, 1.0F);
-
-			if (entity.isClimbingUp())
-				this.animateWalk(CivetAnims.CLIMBING_UP, 1, Math.max(0, 1-entity.getTicksClimbing()/3f), 2.0f, 2.5f);
-		}else {
+			if (entity.isClimbingUp()) {
+				this.animateWalk(CivetAnims.CLIMBING_UP, 1, Math.max(0, 1 - entity.getTicksClimbing()/3f), 2.0f, 2.5f);
+			}
+		} else {
 			if (entity.isInWaterOrBubble()){
 				this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
-			}else {
-				this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+			} else {
+				// En tierra
+				if (limbSwingAmount > 0.01f) {
+					this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+				}
 
 				this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
+
+				this.animate(entity.idleStandUpState,    CivetAnims.STAND_UP,   ageInTicks, 1.0F);
+				this.animate(entity.idleSniffLeftState,  CivetAnims.SNIFF_LEFT, ageInTicks, 1.0F);
+				this.animate(entity.idleSniffRightState, CivetAnims.SNIFF_RIGHT,ageInTicks, 1.0F);
+				this.animate(entity.idleSitState,        CivetAnims.SIT,        ageInTicks, 1.0F);
+				this.animate(entity.idleLayState,        CivetAnims.LAY,        ageInTicks, 1.0F);
 			}
 		}
 
 		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
-		this.animate(entity.attackAnimationState, CivetAnims.ATTACK, ageInTicks, 1.0F);
+		this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
 
 		if (this.young){
 			this.applyStatic(CivetAnims.BABY);
 		}
 	}
+
+
 
 	@Override
 	public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {

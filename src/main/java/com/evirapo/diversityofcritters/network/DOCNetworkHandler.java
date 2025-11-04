@@ -18,6 +18,10 @@ public class DOCNetworkHandler {
     @SuppressWarnings("UnusedAssignment")
     public static void init() {
         int id = 0;
-        CHANNEL.registerMessage(id++, OpenStatsScreenPacket.class, OpenStatsScreenPacket::encode, OpenStatsScreenPacket::decode, OpenStatsScreenPacket.Handler::handle);
+        CHANNEL.registerMessage(id++, OpenStatsScreenPacket.class,
+                OpenStatsScreenPacket::encode, OpenStatsScreenPacket::decode, OpenStatsScreenPacket.Handler::handle);
+
+        CHANNEL.registerMessage(id++, SetDiurnalMsg.class,
+                SetDiurnalMsg::encode, SetDiurnalMsg::decode, SetDiurnalMsg::handle);
     }
 }

@@ -1,28 +1,25 @@
 package com.evirapo.diversityofcritters.common.entity.custom;
 
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
-import com.evirapo.diversityofcritters.common.entity.ai.AnimatedAttackGoal;
-import com.evirapo.diversityofcritters.common.entity.ai.CritterDrinkGoal;
-import com.evirapo.diversityofcritters.common.entity.ai.CustomFloatGoal;
-import com.evirapo.diversityofcritters.common.entity.ai.LookForFoodItems;
+import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.custom.base.IAnimatedAttacker;
+import com.evirapo.diversityofcritters.common.entity.util.ISleepAwareness;
+import com.evirapo.diversityofcritters.common.entity.util.ISleepThreatEvaluator;
+import com.evirapo.diversityofcritters.common.entity.util.SleepCycleController;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
@@ -47,28 +44,65 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraftforge.common.ForgeConfig;
 import net.minecraftforge.common.ForgeMod;
 import net.minecraftforge.fluids.FluidType;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
-public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
+public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, ISleepThreatEvaluator, ISleepAwareness {
 
     public final AnimationState idleAnimationState = new AnimationState();
-    public final AnimationState climbingUpState = new AnimationState();
+    public final AnimationState idleStandUpState   = new AnimationState();
+    public final AnimationState idleSniffLeftState = new AnimationState();
+    public final AnimationState idleSniffRightState= new AnimationState();
+    public final AnimationState idleSitState       = new AnimationState();
+    public final AnimationState idleLayState       = new AnimationState();
+    public final AnimationState climbingUpState    = new AnimationState();
     public final AnimationState attackAnimationState = new AnimationState();
     public final AnimationState drinkingAnimationState = new AnimationState();
 
+    private enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
+
+    private static final EntityDataAccessor<Byte>    IDLE_VARIANT    =
+            SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Integer> IDLE_LOCK_UNTIL =
+            SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
+
+    private static byte toByte(IdleVariant v){
+        return switch (v) {
+            case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
+            case SNIFF_RIGHT -> 3; case SIT -> 4; case LAY -> 5;
+        };
+    }
+    private static IdleVariant fromByte(byte b){
+        return switch (b) {
+            case 1 -> IdleVariant.STAND_UP;
+            case 2 -> IdleVariant.SNIFF_LEFT;
+            case 3 -> IdleVariant.SNIFF_RIGHT;
+            case 4 -> IdleVariant.SIT;
+            case 5 -> IdleVariant.LAY;
+            default -> IdleVariant.NONE;
+        };
+    }
+    private void setIdleVariant(IdleVariant v){ this.entityData.set(IDLE_VARIANT, toByte(v)); }
+    private IdleVariant getIdleVariant(){ return fromByte(this.entityData.get(IDLE_VARIANT)); }
+    private void setIdleLockUntil(int tick){ this.entityData.set(IDLE_LOCK_UNTIL, tick); }
+    private int  getIdleLockUntil(){ return this.entityData.get(IDLE_LOCK_UNTIL); }
+
+    private int idleVariantCooldown = 0;
+
     private LookForFoodItems forFoodGoal;
 
-    private static final EntityDataAccessor<Boolean> IS_ATTACKING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Boolean> IS_CLIMBING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Integer> TICKS_CLIMBING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> IS_ATTACKING =
+            SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> IS_CLIMBING  =
+            SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> TICKS_CLIMBING =
+            SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
 
     public int attackAnimationTimeout;
     int prevTicksClimbing;
@@ -105,109 +139,61 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
         this.targetSelector.addGoal(7, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
     }
 
-    private void triggerFoodSearch() {
-        if (this.forFoodGoal != null) {
-            this.forFoodGoal.trigger();
-        } else {
-            this.navigation.stop();
-            Predicate<ItemEntity> predicate = (p_25258_) -> p_25258_.getItem().is(DoCTags.Items.CIVET_FOOD);
-            List<? extends ItemEntity> list = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate((double)32.0F, (double)8.0F, (double)32.0F), predicate);
-            if (!list.isEmpty()) {
-                this.navigation.moveTo((Entity)list.get(0), 1.1);
-            }
-        }
-    }
-
     @Override
-    public boolean canPickUpLoot() {
-        return true;
-    }
-
-    @Override
-    public boolean canAttack(LivingEntity pTarget) {
-        return super.canAttack(pTarget) && ((this.getLastHurtByMob() != null && this.getLastHurtByMob() == pTarget) || this.isHungry());
-    }
-
-    //attributes
-    public static AttributeSupplier.Builder createAttributes() {
-        return Mob.createMobAttributes()
-                .add(Attributes.MAX_HEALTH, 10.0)
-                .add(Attributes.MOVEMENT_SPEED, (double)0.2F)
-                .add(Attributes.ATTACK_DAMAGE, 2.0D);
-    }
-
     protected void defineSynchedData() {
         super.defineSynchedData();
         this.entityData.define(IS_ATTACKING, false);
         this.entityData.define(IS_CLIMBING, false);
         this.entityData.define(TICKS_CLIMBING, 0);
+        this.entityData.define(IDLE_VARIANT, toByte(IdleVariant.NONE));
+        this.entityData.define(IDLE_LOCK_UNTIL, -1);
     }
 
     @Override
     public void jumpInFluid(FluidType type) {
-        self().setDeltaMovement(self().getDeltaMovement().add(0.0D, (double)0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/3, 0.0D));
+        self().setDeltaMovement(self().getDeltaMovement().add(0.0D, 0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/3, 0.0D));
     }
 
     @Override
     public void sinkInFluid(FluidType type) {
-        self().setDeltaMovement(self().getDeltaMovement().add(0.0D, (double)-0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/6, 0.0D));
+        self().setDeltaMovement(self().getDeltaMovement().add(0.0D, -0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/6, 0.0D));
     }
 
     @Override
     public void aiStep() {
-
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
-
-        if (stack != null && stack.is(DoCTags.Items.CIVET_FOOD)) {
+        if (!stack.isEmpty() && stack.is(DoCTags.Items.CIVET_FOOD)) {
             this.setHunger(Math.min(this.getHunger()+this.maxHunger()/4, this.maxHunger()));
-            this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), (double)0.0F, (double)0.0F, (double)0.0F);
+            this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), 0.0, 0.0, 0.0);
             this.level().playSound(null, new BlockPos((int) this.getX(), (int) this.getY(), (int) this.getZ()), SoundEvents.GENERIC_EAT, SoundSource.AMBIENT);
-            stack.setCount(0);
-            this.setItemInHand(InteractionHand.MAIN_HAND, Items.AIR.getDefaultInstance());
+            stack.shrink(1);
+            if (stack.isEmpty()) this.setItemInHand(InteractionHand.MAIN_HAND, Items.AIR.getDefaultInstance());
         }
 
-        if (isHungry() && (double)this.random.nextFloat() <= 0.2) {
-            this.triggerFoodSearch();
-        }
+        if (isHungry() && (double)this.random.nextFloat() <= 0.2) triggerFoodSearch();
 
         super.aiStep();
 
         Vec3 vec3 = this.getDeltaMovement();
-
-        if (this.isClimbing() && (vec3.y > (0.1D) || vec3.y < (-0.1D))) {
-
-            if (!this.level().isClientSide()){
-                if (this.getTicksClimbing() < 3){
-                    this.prevTicksClimbing = this.getTicksClimbing();
-                    this.setTicksClimbing(this.prevTicksClimbing+1);
-                }
+        if (this.isClimbing() && (Math.abs(vec3.y) > 0.1D)) {
+            if (!this.level().isClientSide && this.getTicksClimbing() < 3) {
+                this.setTicksClimbing(this.getTicksClimbing()+1);
             }
-
         } else {
-
-            if (!this.level().isClientSide()){
-                if (this.getTicksClimbing() > 0){
-                    this.prevTicksClimbing = this.getTicksClimbing();
-                    this.setTicksClimbing(this.prevTicksClimbing-1);
-                }
+            if (!this.level().isClientSide && this.getTicksClimbing() > 0) {
+                this.setTicksClimbing(this.getTicksClimbing()-1);
             }
-
         }
     }
 
-    protected void pickUpItem(ItemEntity itemEntity) {
-        ItemStack item = itemEntity.getItem();
-        if (item.is(DoCTags.Items.CIVET_FOOD)) {
-            ItemStack itemstack = itemEntity.getItem();
-            ItemStack itemstack1 = this.equipItemIfPossible(itemstack.copy());
-            if (!itemstack1.isEmpty()) {
-                this.onItemPickup(itemEntity);
-                this.take(itemEntity, 1);
-                itemstack.shrink(1);
-                if (itemstack.isEmpty()) {
-                    itemEntity.discard();
-                }
-            }
+    private void triggerFoodSearch() {
+        if (this.forFoodGoal != null) {
+            this.forFoodGoal.trigger();
+        } else {
+            this.navigation.stop();
+            Predicate<ItemEntity> predicate = (e) -> e.getItem().is(DoCTags.Items.CIVET_FOOD);
+            List<? extends ItemEntity> list = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(32.0D, 8.0D, 32.0D), predicate);
+            if (!list.isEmpty()) this.navigation.moveTo(list.get(0), 1.1);
         }
     }
 
@@ -216,33 +202,22 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
         super.move(pType, pPos);
         if (!this.noPhysics){
             Vec3 vec3 = this.collide(pPos);
-
-            boolean flag4 = !Mth.equal(pPos.x, vec3.x);
-            boolean flag = !Mth.equal(pPos.z, vec3.z);
+            boolean flagX = !Mth.equal(pPos.x, vec3.x);
+            boolean flagZ = !Mth.equal(pPos.z, vec3.z);
 
             if (!this.navigation.isDone()){
-                if (flag4){
-                    Vec3i vec3i = new Vec3i((int) ((int) this.getX() + Math.max(-1, Math.min(1, pPos.x*100))),
-                            (int) this.getY(),
-                            (int) this.getZ());
-
-                    BlockPos blockPos = new BlockPos(vec3i);
-                    BlockState blockState = this.level().getBlockState(blockPos);
-
-                    this.isClimbableX = blockState.is(DoCTags.Blocks.CIVET_CLIMBABLE);
-                    this.setClimbing(blockState.is(DoCTags.Blocks.CIVET_CLIMBABLE));
-                }else if (flag){
-                    Vec3i vec3i = new Vec3i((int) ((int) this.getX()),
-                            (int) this.getY(),
-                            (int) ((int) this.getZ() + Math.max(-1, Math.min(1, pPos.z*100))));
-                    BlockPos blockPos = new BlockPos(vec3i);
-                    BlockState blockState = this.level().getBlockState(blockPos);
-
-                    this.isClimbableZ = blockState.is(DoCTags.Blocks.CIVET_CLIMBABLE);
-                    this.setClimbing(blockState.is(DoCTags.Blocks.CIVET_CLIMBABLE));
+                if (flagX){
+                    BlockPos bp = new BlockPos(new Vec3i((int)(this.getX()+Math.max(-1, Math.min(1, pPos.x*100))), (int)this.getY(), (int)this.getZ()));
+                    BlockState bs = this.level().getBlockState(bp);
+                    this.isClimbableX = bs.is(DoCTags.Blocks.CIVET_CLIMBABLE);
+                    this.setClimbing(this.isClimbableX);
+                } else if (flagZ){
+                    BlockPos bp = new BlockPos(new Vec3i((int)this.getX(), (int)this.getY(), (int)(this.getZ()+Math.max(-1, Math.min(1, pPos.z*100)))));
+                    BlockState bs = this.level().getBlockState(bp);
+                    this.isClimbableZ = bs.is(DoCTags.Blocks.CIVET_CLIMBABLE);
+                    this.setClimbing(this.isClimbableZ);
                 }
             }
-
         }
     }
 
@@ -257,6 +232,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
         if (!this.level().isClientSide) {
             this.setClimbing(this.horizontalCollision && (this.isClimbableX || this.isClimbableZ));
+            serverHandleIdleVariant();
         }
 
         if (IsDrinking()) {
@@ -264,33 +240,34 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
                 BlockPos washingPos = getDrinkPos();
                 if (this.distanceToSqr(washingPos.getX() + 0.5D, washingPos.getY() + 0.5D, washingPos.getZ() + 0.5D) < 3) {
                     if (this.getRandom().nextInt(3)==0){
-                        for (int j = 0; (float) j < 4; ++j) {
-                            double d2 = (this.random.nextDouble()/2);
-                            double d3 = (this.random.nextDouble()/2);
-                            Vec3 vector3d = this.getDeltaMovement();
-
-                            this.level().addParticle(ParticleTypes.SPLASH, washingPos.getX() + d2, (double) (washingPos.getY() + 0.8F), washingPos.getZ() + d3, vector3d.x, vector3d.y, vector3d.z);
+                        for (int j = 0; j < 4; ++j) {
+                            double d2 = this.random.nextDouble()/2;
+                            double d3 = this.random.nextDouble()/2;
+                            Vec3 v = this.getDeltaMovement();
+                            this.level().addParticle(ParticleTypes.SPLASH, washingPos.getX() + d2, washingPos.getY() + 0.8F, washingPos.getZ() + d3, v.x, v.y, v.z);
                         }
                     }
-
                 } else {
                     setIsDrinking(false);
                 }
             }
         }
 
-        if (this.isEffectiveAi()) {
-            boolean flag = this.isInWaterOrBubble();
-            if (flag || this.getTarget() != null || this.level().isThundering()) {
-                this.wakeUp();
-            }
-        }
-        if (this.level().isClientSide()) {
-            this.setupAnimationStates();
+        if (this.level().isClientSide) {
+            setupAnimationStatesClient();
         }
     }
 
+    @Override
     public void customServerAiStep() {
+        if (getIdleVariant() != IdleVariant.NONE) {
+            this.getNavigation().stop();
+            this.setSprinting(false);
+            this.setPose(Pose.STANDING);
+            this.setTarget(null);
+            return;
+        }
+
         if (this.getMoveControl().hasWanted()) {
             double d0 = this.getMoveControl().getSpeedModifier();
             this.setPose(Pose.STANDING);
@@ -299,16 +276,112 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
             this.setPose(Pose.STANDING);
             this.setSprinting(false);
         }
-
     }
 
-    private void setupAnimationStates() {
-        this.idleAnimationState.animateWhen(this.isAlive(), this.tickCount);
+    @Override
+    protected boolean isIdleLocked() {
+        return getIdleVariant() != IdleVariant.NONE;
+    }
+
+    private static final double IDLE_MOVE_EPS = 0.0004D;
+
+    private void serverHandleIdleVariant() {
+        boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
+        boolean swimming     = this.isInWaterOrBubble();
+        boolean climbing     = this.isClimbing();
+        boolean onGround     = this.onGround();
+
+        boolean hasDeltaMove = this.getDeltaMovement().horizontalDistanceSqr() > IDLE_MOVE_EPS;
+        boolean hasWantedNav = this.getMoveControl().hasWanted();
+        boolean moving       = hasDeltaMove || hasWantedNav;
+
+        boolean doingAttack  = this.isAttacking();
+        boolean drinking     = this.IsDrinking();
+        boolean hasTarget    = this.getTarget() != null;
+
+        boolean idleBase = this.isAlive()
+                && !sleepingLike && !moving && !swimming && !climbing
+                && !doingAttack && !drinking && !hasTarget && onGround;
+
+        IdleVariant current = getIdleVariant();
+
+        if (current != IdleVariant.NONE && getIdleLockUntil() > 0 && this.tickCount >= getIdleLockUntil()) {
+            setIdleVariant(IdleVariant.NONE);
+            setIdleLockUntil(-1);
+            idleVariantCooldown = 100;
+        }
+
+        if (idleVariantCooldown > 0) idleVariantCooldown--;
+
+        if (!idleBase && current != IdleVariant.NONE) {
+            setIdleVariant(IdleVariant.NONE);
+            setIdleLockUntil(-1);
+            idleVariantCooldown = 60;
+            return;
+        }
+
+        if (idleBase && current == IdleVariant.NONE && idleVariantCooldown == 0) {
+            if (this.random.nextFloat() < 0.01f) {
+                startServerIdleVariant(pickVariant());
+            }
+        }
+
+        if (getIdleVariant() != IdleVariant.NONE) {
+            this.getNavigation().stop();
+            this.setTarget(null);
+        }
+    }
+
+    private IdleVariant pickVariant(){
+        int roll = this.random.nextInt(100);
+        if      (roll < 20) return IdleVariant.STAND_UP;
+        else if (roll < 45) return IdleVariant.SNIFF_LEFT;
+        else if (roll < 70) return IdleVariant.SNIFF_RIGHT;
+        else if (roll < 85) return IdleVariant.SIT;
+        else                return IdleVariant.LAY;
+    }
+
+    private void startServerIdleVariant(IdleVariant v){
+        setIdleVariant(v);
+        int dur; int cd;
+        switch (v) {
+            case STAND_UP   -> { dur = 40;  cd = 60;  }
+            case SNIFF_LEFT -> { dur = 40;  cd = 50;  }
+            case SNIFF_RIGHT-> { dur = 40;  cd = 50;  }
+            case SIT        -> { dur = 100; cd = 120; }
+            case LAY        -> { dur = 140; cd = 140; }
+            default         -> { dur = 0;   cd = 0;   }
+        }
+        setIdleLockUntil(dur > 0 ? this.tickCount + dur : -1);
+        idleVariantCooldown = cd;
+    }
+
+    private void setupAnimationStatesClient() {
+        boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
+        boolean swimming     = this.isInWaterOrBubble();
+        boolean climbing     = this.isClimbing();
+        boolean doingAttack  = this.isAttacking();
+        boolean drinking     = this.IsDrinking();
+        boolean hasTarget    = this.getTarget() != null;
+
+        boolean softIdle = this.isAlive()
+                && !sleepingLike && !swimming && !climbing
+                && !doingAttack && !drinking && !hasTarget
+                && getIdleVariant() == IdleVariant.NONE;
+
+        this.idleAnimationState.animateWhen(softIdle, this.tickCount);
+
+        IdleVariant v = getIdleVariant();
+        this.idleStandUpState.animateWhen(   v == IdleVariant.STAND_UP,    this.tickCount);
+        this.idleSniffLeftState.animateWhen( v == IdleVariant.SNIFF_LEFT,  this.tickCount);
+        this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT, this.tickCount);
+        this.idleSitState.animateWhen(       v == IdleVariant.SIT,         this.tickCount);
+        this.idleLayState.animateWhen(       v == IdleVariant.LAY,         this.tickCount);
+
         this.climbingUpState.animateWhen(this.isClimbingUp(), this.tickCount);
         this.drinkingAnimationState.animateWhen(this.isAlive() && this.IsDrinking(), this.tickCount);
 
-
-        if(this.isAttacking() && attackAnimationTimeout <= 0) {
+        if (this.isAttacking() && attackAnimationTimeout <= 0) {
             attackAnimationTimeout = 10;
             attackAnimationState.start(this.tickCount);
         } else {
@@ -317,88 +390,64 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     }
 
     @Override
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor pLevel, DifficultyInstance pDifficulty, MobSpawnType pReason, @Nullable SpawnGroupData pSpawnData, @Nullable CompoundTag pDataTag) {
-        this.setIsMale(this.random.nextBoolean());
-        if (pReason == MobSpawnType.COMMAND && pDataTag == null){
-            if (this.getHunger() == 0 && this.getThirst() == 0){
-                this.setHunger(this.maxHunger());
-                this.setThirst(this.maxThirst());
+    public boolean hurt(DamageSource src, float amt) {
+        boolean res = super.hurt(src, amt);
+        if (!level().isClientSide && getIdleVariant() != IdleVariant.NONE) {
+            setIdleVariant(IdleVariant.NONE);
+            setIdleLockUntil(-1);
+            idleVariantCooldown = 80;
+        }
+        return res;
+    }
+
+    public static AttributeSupplier.Builder createAttributes() {
+        return Mob.createMobAttributes()
+                .add(Attributes.MAX_HEALTH, 10.0)
+                .add(Attributes.MOVEMENT_SPEED, 0.2D)
+                .add(Attributes.ATTACK_DAMAGE, 2.0D);
+    }
+
+    @Override
+    public boolean canPickUpLoot() { return true; }
+
+    @Override
+    public boolean canAttack(LivingEntity pTarget) {
+        return super.canAttack(pTarget) && ((this.getLastHurtByMob() != null && this.getLastHurtByMob() == pTarget) || this.isHungry());
+    }
+
+    @Override
+    public void pickUpItem(ItemEntity itemEntity) {
+        ItemStack item = itemEntity.getItem();
+        if (item.is(DoCTags.Items.CIVET_FOOD)) {
+            ItemStack copy = item.copy();
+            ItemStack left = this.equipItemIfPossible(copy);
+            if (!left.isEmpty()) {
+                this.onItemPickup(itemEntity);
+                this.take(itemEntity, 1);
+                item.shrink(1);
+                if (item.isEmpty()) itemEntity.discard();
             }
         }
-        return super.finalizeSpawn(pLevel, pDifficulty, pReason, pSpawnData, pDataTag);
     }
 
-    @Override
-    public boolean canMate(Animal pOtherAnimal) {
-        CivetEntity otherLion = (CivetEntity) pOtherAnimal;
-        return otherLion.getIsMale() != this.getIsMale() && super.canMate(pOtherAnimal);
-    }
+    @Override public int maxHunger() { return 20*60*100; }
+    @Override public int maxThirst() { return 20*60*100; }
 
-    @Nullable
-    @Override
-    public AgeableMob getBreedOffspring(ServerLevel pLevel, AgeableMob pOtherParent) {
-        CivetEntity lion = DOCEntities.CIVET.get().create(pLevel);
-        lion.setIsMale(this.random.nextBoolean());
-        return lion;
-    }
+    @Override public boolean isAttacking() { return this.entityData.get(IS_ATTACKING); }
+    @Override public void setAttacking(boolean v) { this.entityData.set(IS_ATTACKING, v); }
 
-    @Override
-    public int maxHunger() {
-        return 20*60*100;//1 second, 1 minute, 100 minutes, 1% per minute
-        //return 20*30;
-    }
+    public boolean isClimbing() { return this.entityData.get(IS_CLIMBING); }
+    public int getTicksClimbing() { return this.entityData.get(TICKS_CLIMBING); }
+    public void setTicksClimbing(int v) { this.entityData.set(TICKS_CLIMBING, v); }
+    public boolean isClimbingUp() { return this.isClimbing() && this.getDeltaMovement().y>0.1f; }
+    public void setClimbing(boolean v) { this.entityData.set(IS_CLIMBING, v); }
+    public boolean onClimbable() { return isClimbing(); }
 
-    @Override
-    public int maxThirst() {
-        return 20*60*100;
-    }
+    @Override public int  attackAnimationTimeout() { return this.attackAnimationTimeout; }
+    @Override public void setAttackAnimationTimeout(int v) { this.attackAnimationTimeout = v; }
 
-    @Override
-    public boolean isAttacking() {
-        return this.entityData.get(IS_ATTACKING);
-    }
-
-    @Override
-    public void setAttacking(boolean pFromBucket) {
-        this.entityData.set(IS_ATTACKING, pFromBucket);
-    }
-
-    public boolean isClimbing() {
-        return this.entityData.get(IS_CLIMBING);
-    }
-
-    public int getTicksClimbing() {
-        return this.entityData.get(TICKS_CLIMBING);
-    }
-
-    public void setTicksClimbing(int variant) {
-        this.entityData.set(TICKS_CLIMBING, variant);
-    }
-
-    public boolean isClimbingUp() {
-        return this.isClimbing() && this.getDeltaMovement().y>0.1f;
-    }
-
-    public void setClimbing(boolean pFromBucket) {
-        this.entityData.set(IS_CLIMBING, pFromBucket);
-    }
-
-    public boolean onClimbable() {
-        return isClimbing();
-    }
-
-    @Override
-    public int attackAnimationTimeout() {
-        return this.attackAnimationTimeout;
-    }
-
-    @Override
-    public void setAttackAnimationTimeout(int attackAnimationTimeout) {
-        this.attackAnimationTimeout = attackAnimationTimeout;
-    }
-
-    public static boolean checkCivetSpawnRules(EntityType<CivetEntity> pOcelot, LevelAccessor pLevel, MobSpawnType pSpawnType, BlockPos pPos, RandomSource pRandom) {
-        return pRandom.nextInt(3) != 0;
+    public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
+        return rnd.nextInt(3) != 0;
     }
 
     private Vec3 collide(Vec3 pVec) {
@@ -411,21 +460,38 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
         boolean flag3 = this.onGround() || flag1 && pVec.y < 0.0D;
         float stepHeight = getStepHeight();
         if (stepHeight > 0.0F && flag3 && (flag || flag2)) {
-            Vec3 vec31 = collideBoundingBox(this, new Vec3(pVec.x, (double)stepHeight, pVec.z), aabb, this.level(), list);
-            Vec3 vec32 = collideBoundingBox(this, new Vec3(0.0D, (double)stepHeight, 0.0D), aabb.expandTowards(pVec.x, 0.0D, pVec.z), this.level(), list);
+            Vec3 vec31 = collideBoundingBox(this, new Vec3(pVec.x, stepHeight, pVec.z), aabb, this.level(), list);
+            Vec3 vec32 = collideBoundingBox(this, new Vec3(0.0D, stepHeight, 0.0D), aabb.expandTowards(pVec.x, 0.0D, pVec.z), this.level(), list);
             if (vec32.y < (double)stepHeight) {
                 Vec3 vec33 = collideBoundingBox(this, new Vec3(pVec.x, 0.0D, pVec.z), aabb.move(vec32), this.level(), list).add(vec32);
-                if (vec33.horizontalDistanceSqr() > vec31.horizontalDistanceSqr()) {
-                    vec31 = vec33;
-                }
+                if (vec33.horizontalDistanceSqr() > vec31.horizontalDistanceSqr()) vec31 = vec33;
             }
-
             if (vec31.horizontalDistanceSqr() > vec3.horizontalDistanceSqr()) {
                 return vec31.add(collideBoundingBox(this, new Vec3(0.0D, -vec31.y + pVec.y, 0.0D), aabb.move(vec31), this.level(), list));
             }
         }
-
         return vec3;
     }
 
+    @Nullable
+    @Override
+    public AgeableMob getBreedOffspring(ServerLevel pLevel, AgeableMob pOtherParent) {
+        CivetEntity civet = DOCEntities.CIVET.get().create(pLevel);
+        civet.setIsMale(this.random.nextBoolean());
+        return civet;
+    }
+
+    // --------- SLEEP ---------
+    @Override
+    protected SleepCycleController<DiverseCritter> createSleepController() {
+        return new SleepCycleController<>(this, preparingSleepState, sleepState, awakeningState,
+                getPreparingSleepDuration(), getAwakeningDuration());
+    }
+    @Override protected int getPreparingSleepDuration() {return 40;}
+    @Override protected int getAwakeningDuration() {return 40;}
+
+    @Override public Set<EntityType<?>> getInterruptingEntityTypes() { return Collections.emptySet(); }
+    @Override public boolean shouldInterruptSleepDueTo(LivingEntity nearby) { return nearby.getMobType() == MobType.UNDEAD; }
+    @Override public boolean shouldWakeOnPlayerProximity() { return false; }
+    @Override protected boolean getDefaultDiurnal() { return false; }
 }
