@@ -343,12 +343,14 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
     @Override
     public void travel(Vec3 travelVector) {
         if (isSleeping() || isPreparingSleep() || isAwakeing() || isIdleLocked()) {
-            setDeltaMovement(Vec3.ZERO);
+            setDeltaMovement(getDeltaMovement().multiply(0.0, 1.0, 0.0));
             getNavigation().stop();
+            super.travel(Vec3.ZERO);
             return;
         }
         super.travel(travelVector);
     }
+
 
     @Override
     public boolean hurt(DamageSource source, float amount) {

@@ -122,15 +122,15 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			this.climbing = false;
 			this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
 			this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
-			return;
 		}
 
 		this.climbing = entity.isClimbing();
 
 		if (entity.isClimbing()){
-			this.animate(entity.idleAnimationState, CivetAnims.CLIMBING_UP, ageInTicks, 1.0F);
+			this.animate(entity.climbingUpState, CivetAnims.CLIMBING_UP, ageInTicks, 1.0F);
+
 			if (entity.isClimbingUp()) {
-				this.animateWalk(CivetAnims.CLIMBING_UP, 1, Math.max(0, 1 - entity.getTicksClimbing()/3f), 2.0f, 2.5f);
+				this.animateWalk(CivetAnims.CLIMBING_UP, limbSwing, Math.max(0.1f, limbSwingAmount), 2.0f, 2.5f);
 			}
 		} else {
 			if (entity.isInWaterOrBubble()){
