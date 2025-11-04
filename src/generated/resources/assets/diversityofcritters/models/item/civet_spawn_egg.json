@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "diversityofcritters:item/civet_spawn_egg"
+  }
+}
