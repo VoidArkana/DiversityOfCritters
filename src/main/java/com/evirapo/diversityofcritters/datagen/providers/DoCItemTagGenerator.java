@@ -23,7 +23,7 @@ public class DoCItemTagGenerator extends ItemTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider provider) {
 
-        this.tag(DoCTags.Items.CIVET_FOOD).add(
+        this.tag(DoCTags.Items.MEATS).add(
                 Items.RABBIT,
                 Items.COOKED_RABBIT,
                 Items.CHICKEN,

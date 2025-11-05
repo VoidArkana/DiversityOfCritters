@@ -19,6 +19,7 @@ import net.minecraft.world.*;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.AnimationState;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.control.LookControl;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.animal.Animal;
@@ -35,7 +36,7 @@ import net.minecraftforge.network.PacketDistributor;
 import javax.annotation.Nullable;
 import java.util.Optional;
 
-public abstract class DiverseCritter extends Animal implements ContainerListener, ISleepingEntity {
+public abstract class DiverseCritter extends TamableAnimal implements ContainerListener, ISleepingEntity {
 
     private static final EntityDataAccessor<Boolean> IS_MALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
@@ -51,7 +52,7 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
     int prevHunger;
     int prevThirst;
 
-    protected DiverseCritter(EntityType<? extends Animal> pEntityType, Level pLevel) {
+    protected DiverseCritter(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.createInventory();
         this.lookControl = new CritterLookControl();
@@ -376,7 +377,6 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
         }
         if (key == PREPARING_SLEEP) {
             if (this.isPreparingSleep()) {
-                System.out.println("[CLIENT][Sync] → start preparing_sleep");
                 preparingSleepState.start(this.tickCount);
                 sleepState.stop();
                 awakeningState.stop();
@@ -387,7 +387,6 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
         }
         if (key == SLEEPING) {
             if (this.isSleeping()) {
-                System.out.println("[CLIENT][Sync] → start sleep");
                 sleepState.start(this.tickCount);
                 preparingSleepState.stop();
                 awakeningState.stop();
@@ -398,7 +397,6 @@ public abstract class DiverseCritter extends Animal implements ContainerListener
         }
         if (key == AWAKENING) {
             if (this.isAwakeing()) {
-                System.out.println("[CLIENT][Sync] → start awakeing");
                 awakeningState.start(this.tickCount);
                 sleepState.stop();
                 preparingSleepState.stop();

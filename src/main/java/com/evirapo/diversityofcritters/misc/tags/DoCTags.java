@@ -12,7 +12,7 @@ public class DoCTags {
 
     public static class Items {
 
-        public static final TagKey<Item> CIVET_FOOD = create("is_civet_food");
+        public static final TagKey<Item> MEATS = create("meats");
 
         private static TagKey<Item> create(String pName) {
             return TagKey.create(Registries.ITEM, new ResourceLocation(DiversityOfCritters.MODID, pName));

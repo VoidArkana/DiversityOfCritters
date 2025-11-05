@@ -12,15 +12,18 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -34,6 +37,7 @@ import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -41,10 +45,12 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.common.ForgeMod;
+import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.fluids.FluidType;
 import org.jetbrains.annotations.Nullable;
 
@@ -109,7 +115,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     public boolean isClimbableX;
     public boolean isClimbableZ;
 
-    public CivetEntity(EntityType<? extends Animal> pEntityType, Level pLevel) {
+    public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
     }
@@ -124,7 +130,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     }
 
     protected void registerGoals() {
-        this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.CIVET_FOOD);
+        this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS);
         this.goalSelector.addGoal(3, this.forFoodGoal);
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
         this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
@@ -162,7 +168,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     @Override
     public void aiStep() {
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
-        if (!stack.isEmpty() && stack.is(DoCTags.Items.CIVET_FOOD)) {
+        if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS)) {
             this.setHunger(Math.min(this.getHunger()+this.maxHunger()/4, this.maxHunger()));
             this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), 0.0, 0.0, 0.0);
             this.level().playSound(null, new BlockPos((int) this.getX(), (int) this.getY(), (int) this.getZ()), SoundEvents.GENERIC_EAT, SoundSource.AMBIENT);
@@ -191,7 +197,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
             this.forFoodGoal.trigger();
         } else {
             this.navigation.stop();
-            Predicate<ItemEntity> predicate = (e) -> e.getItem().is(DoCTags.Items.CIVET_FOOD);
+            Predicate<ItemEntity> predicate = (e) -> e.getItem().is(DoCTags.Items.MEATS);
             List<? extends ItemEntity> list = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(32.0D, 8.0D, 32.0D), predicate);
             if (!list.isEmpty()) this.navigation.moveTo(list.get(0), 1.1);
         }
@@ -418,7 +424,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     @Override
     public void pickUpItem(ItemEntity itemEntity) {
         ItemStack item = itemEntity.getItem();
-        if (item.is(DoCTags.Items.CIVET_FOOD)) {
+        if (item.is(DoCTags.Items.MEATS)) {
             ItemStack copy = item.copy();
             ItemStack left = this.equipItemIfPossible(copy);
             if (!left.isEmpty()) {
@@ -494,4 +500,68 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     @Override public boolean shouldInterruptSleepDueTo(LivingEntity nearby) { return nearby.getMobType() == MobType.UNDEAD; }
     @Override public boolean shouldWakeOnPlayerProximity() { return false; }
     @Override protected boolean getDefaultDiurnal() { return false; }
+
+    private int tamingFeedsLeft = 0;
+
+    @Override
+    public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
+        ItemStack itemstack = pPlayer.getItemInHand(pHand);
+
+        boolean isItemTamingMeat = itemstack.is(DoCTags.Items.MEATS) || itemstack.is(ItemTags.FISHES);
+
+        if (isItemTamingMeat && !this.isTame()) {
+            if (this.level().isClientSide()) {
+                return InteractionResult.CONSUME;
+            } else {
+                if (!pPlayer.getAbilities().instabuild) {
+                    itemstack.shrink(1);
+                }
+
+                if (this.tamingFeedsLeft <= 0) {
+                    this.tamingFeedsLeft = 3 + this.random.nextInt(3);
+                }
+
+                this.tamingFeedsLeft--;
+
+                if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
+                    this.tame(pPlayer);
+                    this.navigation.recomputePath();
+                    this.setTarget(null);
+                    this.level().broadcastEntityEvent(this, (byte)7);
+                    this.setOrderedToSit(true);
+                    this.setInSittingPose(true);
+                } else {
+                    this.level().broadcastEntityEvent(this, (byte)6);
+                }
+
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        if (this.isTame()) {
+            if (this.isFood(itemstack) && this.getHealth() < this.getMaxHealth()) {
+                var foodProps = itemstack.isEdible() ? itemstack.getFoodProperties(this) : null;
+                if (foodProps != null) this.heal((float) foodProps.getNutrition());
+                if (!pPlayer.getAbilities().instabuild) itemstack.shrink(1);
+                this.level().broadcastEntityEvent(this, (byte)7);
+                this.gameEvent(GameEvent.EAT, this);
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        return super.mobInteract(pPlayer, pHand);
+    }
+
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putInt("TamingFeedsLeft", this.tamingFeedsLeft);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
+    }
 }
