@@ -17,9 +17,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.*;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.AnimationState;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.control.LookControl;
 import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.animal.Animal;
@@ -27,6 +25,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.pathfinder.BlockPathTypes;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
@@ -291,6 +290,18 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
 
         return super.mobInteract(pPlayer, pHand);
+    }
+
+    @Override
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty,
+                                        MobSpawnType reason, @Nullable SpawnGroupData spawnData,
+                                        @Nullable CompoundTag dataTag) {
+        SpawnGroupData res = super.finalizeSpawn(level, difficulty, reason, spawnData, dataTag);
+
+        if (dataTag == null || !dataTag.contains("IsMale")) {
+            this.setIsMale(this.random.nextBoolean());
+        }
+        return res;
     }
 
 
