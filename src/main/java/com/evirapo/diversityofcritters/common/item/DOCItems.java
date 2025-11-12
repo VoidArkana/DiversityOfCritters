@@ -25,6 +25,9 @@ public class DOCItems {
     public static final RegistryObject<Item> ENTITY_TAB_ICON = ITEM_TYPES.register("entity_tab_icon",
             ()-> new Item(new Item.Properties()));
 
+    public static final RegistryObject<Item> TRAINING_STICK = ITEM_TYPES.register("training_stick",
+            ()-> new Item(new Item.Properties()));
+
     public static void register(IEventBus eventBus) {
         ITEM_TYPES.register(eventBus);
     }

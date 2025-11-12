@@ -20,10 +20,12 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.control.LookControl;
 import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
+import net.minecraft.world.entity.ai.goal.SitWhenOrderedToGoal;
+import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.pathfinder.BlockPathTypes;
@@ -43,10 +45,12 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Integer> THIRST = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DRINKING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Optional<BlockPos>> DRINK_POS = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
+
     protected static final EntityDataAccessor<Boolean> SLEEPING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     protected static final EntityDataAccessor<Boolean> PREPARING_SLEEP = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     protected static final EntityDataAccessor<Boolean> AWAKENING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     protected static final EntityDataAccessor<Boolean> DIURNAL = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
+    protected static final EntityDataAccessor<Boolean> WANDERING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
     int prevHunger;
     int prevThirst;
@@ -60,14 +64,16 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.sleepController = createSleepController();
     }
 
-    public int maxHunger(){
-        return 100;
-    }
+    public int maxHunger(){ return 100; }
+    public int maxThirst(){ return 100; }
 
-    public int maxThirst(){
-        return 100;
-    }
+    // ---------- STATE HELPERS (WANDERING/FOLLOWING) ----------
+    public boolean isWandering() { return this.entityData.get(WANDERING); }
+    public void setWandering(boolean value) { this.entityData.set(WANDERING, value); }
+    /** Estado derivado: siguiendo al dueño cuando no está sentado ni en wandering */
+    public boolean isFollowing() { return !this.isOrderedToSit() && !this.isWandering(); }
 
+    // ---------- SYNC ----------
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
@@ -77,12 +83,16 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(DRINKING, false);
         this.entityData.define(DRINK_POS, Optional.empty());
         this.entityData.define(DATA_FLAGS_ID, (byte)0);
+
         this.entityData.define(SLEEPING, false);
         this.entityData.define(PREPARING_SLEEP, false);
         this.entityData.define(AWAKENING, false);
         this.entityData.define(DIURNAL, getDefaultDiurnal());
+
+        this.entityData.define(WANDERING, false);
     }
 
+    // ---------- NBT ----------
     @Override
     public void addAdditionalSaveData(CompoundTag pCompound) {
         super.addAdditionalSaveData(pCompound);
@@ -93,6 +103,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         pCompound.putBoolean("PreparingSleep", isPreparingSleep());
         pCompound.putBoolean("Awakening", isAwakeing());
         pCompound.putBoolean("Diurnal", this.isDiurnal());
+        pCompound.putBoolean("Wandering", this.isWandering());
     }
 
     @Override
@@ -105,75 +116,41 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         setPreparingSleep(pCompound.getBoolean("PreparingSleep"));
         setAwakeing(pCompound.getBoolean("Awakening"));
         this.setDiurnal(pCompound.getBoolean("Diurnal"));
+        this.setWandering(pCompound.getBoolean("Wandering"));
     }
 
-    public Boolean getIsMale() {
-        return this.entityData.get(IS_MALE);
-    }
+    // ---------- BASIC GET/SET ----------
 
-    public void setIsMale(Boolean isMale) {
-        this.entityData.set(IS_MALE, isMale);
-    }
+    public Boolean getIsMale() { return this.entityData.get(IS_MALE); }
+    public void setIsMale(Boolean isMale) { this.entityData.set(IS_MALE, isMale); }
 
-    public int getHungerPercentage() {
-        return (100 * this.getHunger())/this.maxHunger();
-    }
+    public int getHungerPercentage() { return (100 * this.getHunger())/this.maxHunger(); }
+    public int getThirstPercentage() { return (100 * this.getThirst())/this.maxThirst(); }
 
-    public int getThirstPercentage() {
-        return (100 * this.getThirst())/this.maxThirst();
-    }
+    public int getHunger() { return this.entityData.get(HUNGER); }
+    public void setHunger(int hunger) { this.entityData.set(HUNGER, hunger); }
 
-    public int getHunger() {
-        return this.entityData.get(HUNGER);
-    }
+    public int getThirst() { return this.entityData.get(THIRST); }
+    public void setThirst(int thirst) { this.entityData.set(THIRST, thirst); }
 
-    public void setHunger(int hunger) {
-        this.entityData.set(HUNGER, hunger);
-    }
+    public Boolean IsDrinking() { return this.entityData.get(DRINKING); }
+    public void setIsDrinking(Boolean isDrinking) { this.entityData.set(DRINKING, isDrinking); }
 
-    public int getThirst() {
-        return this.entityData.get(THIRST);
-    }
+    public BlockPos getDrinkPos() { return this.entityData.get(DRINK_POS).orElse(null); }
+    public void setDrinkPos(BlockPos washingPos) { this.entityData.set(DRINK_POS, Optional.ofNullable(washingPos)); }
 
-    public void setThirst(int hunger) {
-        this.entityData.set(THIRST, hunger);
-    }
+    public void clearStates() { this.setSleeping(false); }
 
-    public Boolean IsDrinking() {
-        return this.entityData.get(DRINKING);
-    }
-
-    public void setIsDrinking(Boolean isDrinking) {
-        this.entityData.set(DRINKING, isDrinking);
-    }
-
-    public BlockPos getDrinkPos() {
-        return this.entityData.get(DRINK_POS).orElse(null);
-    }
-
-    public void setDrinkPos(BlockPos washingPos) {
-        this.entityData.set(DRINK_POS, Optional.ofNullable(washingPos));
-    }
-
-    public void clearStates() {
-        this.setSleeping(false);
-    }
-
-    protected boolean getFlag(int pFlagId) {
-        return (this.entityData.get(DATA_FLAGS_ID) & pFlagId) != 0;
-    }
-
+    protected boolean getFlag(int pFlagId) { return (this.entityData.get(DATA_FLAGS_ID) & pFlagId) != 0; }
     protected void setFlag(int pFlagId, boolean pValue) {
-        if (pValue) {
-            this.entityData.set(DATA_FLAGS_ID, (byte)(this.entityData.get(DATA_FLAGS_ID) | pFlagId));
-        } else {
-            this.entityData.set(DATA_FLAGS_ID, (byte)(this.entityData.get(DATA_FLAGS_ID) & ~pFlagId));
-        }
+        if (pValue) this.entityData.set(DATA_FLAGS_ID, (byte)(this.entityData.get(DATA_FLAGS_ID) | pFlagId));
+        else this.entityData.set(DATA_FLAGS_ID, (byte)(this.entityData.get(DATA_FLAGS_ID) & ~pFlagId));
     }
+
+    // ---------- TICK ----------
 
     @Override
     public void tick() {
-
         if (sleepController == null) {
             sleepController = createSleepController();
         }
@@ -195,49 +172,35 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             this.starve();
         }
 
+        if (this.isOrderedToSit()) {
+            if (!this.level().isClientSide) this.getNavigation().stop();
+            Vec3 currentDelta = this.getDeltaMovement();
+            this.setDeltaMovement(0.0D, currentDelta.y, 0.0D);
+        }
+
+        if (this.level().isClientSide()) {
+            updateSitAnimationClient();
+        }
+
         super.tick();
     }
 
-    protected void starve() {
-        this.hurt(level().damageSources().starve(), 1);
-    }
+    protected void starve() { this.hurt(level().damageSources().starve(), 1); }
 
+    // ---------- CONTROLS ----------
     public class CritterLookControl extends LookControl {
-        public CritterLookControl() {
-            super(DiverseCritter.this);
-        }
-
-        public void tick() {
-            if (!DiverseCritter.this.isSleeping()) {
-                super.tick();
-            }
-
-        }
-
-        protected boolean resetXRotOnTick() {
-            return !DiverseCritter.this.isCrouching();
-        }
+        public CritterLookControl() { super(DiverseCritter.this); }
+        public void tick() { if (!DiverseCritter.this.isSleeping()) { super.tick(); } }
+        protected boolean resetXRotOnTick() { return !DiverseCritter.this.isCrouching(); }
     }
 
     public class CritterMoveControl extends MoveControl {
-        public CritterMoveControl() {
-            super(DiverseCritter.this);
-        }
-
-        public void tick() {
-            if (DiverseCritter.this.canMove()) {
-                super.tick();
-            }
-        }
+        public CritterMoveControl() { super(DiverseCritter.this); }
+        public void tick() { if (DiverseCritter.this.canMove()) { super.tick(); } }
     }
 
-    public boolean isThirsty(){
-        return this.getThirst() > (this.maxThirst()/2);
-    }
-
-    public boolean isHungry(){
-        return this.getHunger() <= (this.maxHunger()/2);
-    }
+    public boolean isThirsty(){ return this.getThirst() > (this.maxThirst()/2); }
+    public boolean isHungry(){ return this.getHunger() <= (this.maxHunger()/2); }
 
     private boolean inventoryOpen;
     private DiverseInventory inventory;
@@ -248,7 +211,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (simplecontainer != null) {
             simplecontainer.removeListener(this);
         }
-
         this.getInventory().addListener(this);
     }
 
@@ -258,9 +220,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             if (sp.containerMenu != sp.inventoryMenu) {
                 sp.closeContainer();
             }
-
             sp.nextContainerCounter();
-            DOCNetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), new OpenStatsScreenPacket(sp.containerCounter, this.getId()));
+            DOCNetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp),
+                    new OpenStatsScreenPacket(sp.containerCounter, this.getId()));
             sp.containerMenu = new DOCStatsMenu(sp.containerCounter, this.getInventory(), sp.getInventory());
             sp.initMenu(sp.containerMenu);
             this.inventoryOpen = true;
@@ -268,17 +230,14 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
-    @Nullable
-    public SimpleContainer getInventory() {
-        return this.inventory;
-    }
+    @Nullable public SimpleContainer getInventory() { return this.inventory; }
+    public void closeInventory() { this.inventoryOpen = false; }
+    @Override public void containerChanged(Container pContainer) {}
 
-    public void closeInventory() {
-        this.inventoryOpen = false;
+    // ---------- INTERACT ----------
+    protected void messageState(String state, Player player) {
+        player.displayClientMessage(this.getName().copy().append(Component.literal(" is now " + state)), true);
     }
-
-    @Override
-    public void containerChanged(Container pContainer) {}
 
     @Override
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
@@ -289,24 +248,63 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             return InteractionResult.SUCCESS;
         }
 
+        if (this.isOwnedBy(pPlayer) && itemstack.is(DOCItems.TRAINING_STICK.get())) {
+            if (level().isClientSide) return InteractionResult.CONSUME;
+
+            if (!this.isOrderedToSit() && !this.isWandering()) {
+                this.setWandering(true);
+                this.setOrderedToSit(false);
+                this.setInSittingPose(false);
+                this.messageState("wandering", pPlayer);
+            } else {
+                boolean willSit = !this.isOrderedToSit();
+                if (willSit) {
+                    setModeSit(true);
+                    this.level().playSound(null, this.blockPosition(),
+                            SoundEvents.WOOL_PLACE, SoundSource.NEUTRAL, 0.6f, 1.0f);
+                } else {
+                    this.setWandering(false);
+                    this.setOrderedToSit(false);
+                    this.setInSittingPose(false);
+                }
+                this.messageState(willSit ? "sit" : "following", pPlayer);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide);
+        }
         return super.mobInteract(pPlayer, pHand);
     }
 
+    private void setModeSit(boolean sit) {
+        this.setWandering(false);
+        this.setOrderedToSit(sit);
+        this.setInSittingPose(sit);
+
+        if (sit) {
+            if (!level().isClientSide) {
+                this.getNavigation().stop();
+                this.getMoveControl().setWantedPosition(this.getX(), this.getY(), this.getZ(), 0.0D);
+            }
+            this.setSprinting(false);
+            this.setJumping(false);
+            Vec3 dm = this.getDeltaMovement();
+            this.setDeltaMovement(0.0D, dm.y, 0.0D);
+        }
+    }
+
+
+    // ---------- SPAWN ----------
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty,
                                         MobSpawnType reason, @Nullable SpawnGroupData spawnData,
                                         @Nullable CompoundTag dataTag) {
         SpawnGroupData res = super.finalizeSpawn(level, difficulty, reason, spawnData, dataTag);
-
         if (dataTag == null || !dataTag.contains("IsMale")) {
             this.setIsMale(this.random.nextBoolean());
         }
         return res;
     }
 
-
-    //--------Sleep----------
-
+    // ---------- SLEPP ----------
     @Override public boolean isSleeping() { return entityData.get(SLEEPING); }
     @Override public void setSleeping(boolean value) { entityData.set(SLEEPING, value); }
     @Override public boolean isPreparingSleep() { return entityData.get(PREPARING_SLEEP); }
@@ -320,13 +318,12 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public final AnimationState preparingSleepState = new AnimationState();
     public final AnimationState sleepState = new AnimationState();
     public final AnimationState awakeningState = new AnimationState();
+    public final AnimationState sitState = new AnimationState();
 
     public SleepCycleController<DiverseCritter> sleepController;
 
     protected int getPreparingSleepDuration() { return 0; }
-
     protected int getAwakeningDuration() { return 0; }
-
     protected boolean getDefaultDiurnal() { return true; }
 
     protected SleepCycleController<DiverseCritter> createSleepController() {
@@ -336,12 +333,11 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         );
     }
 
-    protected boolean isIdleLocked() {
-        return false;
-    }
+    protected boolean isIdleLocked() { return false; }
 
     boolean canMove() {
-        return !this.isSleeping() && !this.isAwakeing() && !this.isPreparingSleep() && !this.isIdleLocked();
+        return !this.isSleeping() && !this.isAwakeing() && !this.isPreparingSleep()
+                && !this.isIdleLocked() && !this.isOrderedToSit();
     }
 
     @Override
@@ -354,9 +350,13 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     @Override
     public void travel(Vec3 travelVector) {
-        if (isSleeping() || isPreparingSleep() || isAwakeing() || isIdleLocked()) {
-            setDeltaMovement(getDeltaMovement().multiply(0.0, 1.0, 0.0));
-            getNavigation().stop();
+        if (isSleeping() || isPreparingSleep() || isAwakeing() || isIdleLocked() || this.isOrderedToSit()) {
+            if (!level().isClientSide) {
+                this.getNavigation().stop();
+                this.getMoveControl().setWantedPosition(this.getX(), this.getY(), this.getZ(), 0.0D);
+            }
+            Vec3 dm = this.getDeltaMovement();
+            this.setDeltaMovement(0.0D, dm.y, 0.0D);
             super.travel(Vec3.ZERO);
             return;
         }
@@ -367,7 +367,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     @Override
     public boolean hurt(DamageSource source, float amount) {
         boolean result = super.hurt(source, amount);
-
         if (!this.level().isClientSide && result && this.getTarget() == null) {
             if (this.sleepController != null) {
                 this.sleepController.interruptSleep("damage", this.tickCount);
@@ -415,6 +414,22 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             } else {
                 awakeningState.stop();
             }
+        }
+    }
+
+    protected void updateSitAnimationClient() {
+        if (this.isSleeping() || this.isPreparingSleep() || this.isAwakeing()) {
+            if (sitState.isStarted()) sitState.stop();
+            return;
+        }
+
+
+        if (this.isInSittingPose() && !this.isWandering()) {
+            if (!sitState.isStarted()) {
+                sitState.start(this.tickCount);
+            }
+        } else {
+            if (sitState.isStarted()) sitState.stop();
         }
     }
 

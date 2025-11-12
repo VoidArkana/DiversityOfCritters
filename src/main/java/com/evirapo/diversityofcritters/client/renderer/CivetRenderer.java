@@ -19,7 +19,7 @@ public class CivetRenderer<T extends CivetEntity> extends MobRenderer<T, CivetMo
 
     private static final ResourceLocation LION_MALE = new ResourceLocation(DiversityOfCritters.MODID,"textures/entity/civet/civet_tan.png");
     public CivetRenderer(EntityRendererProvider.Context pContext) {
-        super(pContext, new CivetModel<>(pContext.bakeLayer(ModelLayers.CIVET_LAYER)), 0.35F);
+        super(pContext, new CivetModel<>(pContext.bakeLayer(ModelLayers.CIVET_LAYER)), 0.20F);
     }
 
     @Override

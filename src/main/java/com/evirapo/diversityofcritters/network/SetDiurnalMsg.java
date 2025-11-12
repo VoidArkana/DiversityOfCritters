@@ -25,10 +25,9 @@ public class SetDiurnalMsg {
 
     public static void handle(SetDiurnalMsg msg, Supplier<NetworkEvent.Context> ctxSupplier) {
         var ctx = ctxSupplier.get();
-        // ¡MUY IMPORTANTE!: esto asegura que se ejecute en el hilo del SERVIDOR
         ctx.enqueueWork(() -> {
-            var player = ctx.getSender();            // null en cliente, no en servidor
-            if (player == null) return;              // seguridad: sólo servidor
+            var player = ctx.getSender();
+            if (player == null) return;
 
             var level = player.level();
             var e = level.getEntity(msg.entityId);
@@ -36,7 +35,6 @@ public class SetDiurnalMsg {
                 critter.setDiurnal(msg.diurnal);
                 System.out.println("[SLEEP][SVR][GUI] SetDiurnal entity#" + critter.getId() + " -> " + msg.diurnal);
 
-                // Igual que con el reloj: forzamos la transición inmediata
                 if (critter.sleepController != null) {
                     critter.sleepController.interruptSleep("ui_toggle", critter.tickCount);
                 } else {

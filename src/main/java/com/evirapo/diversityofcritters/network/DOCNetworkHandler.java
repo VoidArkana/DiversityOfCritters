@@ -23,5 +23,8 @@ public class DOCNetworkHandler {
 
         CHANNEL.registerMessage(id++, SetDiurnalMsg.class,
                 SetDiurnalMsg::encode, SetDiurnalMsg::decode, SetDiurnalMsg::handle);
+
+        CHANNEL.registerMessage(id++, ReleaseCritterMsg.class,
+                ReleaseCritterMsg::encode, ReleaseCritterMsg::decode, ReleaseCritterMsg::handle);
     }
 }

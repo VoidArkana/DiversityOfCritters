@@ -31,6 +31,7 @@ public class DOCEntitiesCreativeTab {
                     .displayItems((itemDisplayParameters, output) -> {
 
                         output.accept(DOCItems.ZOO_BOOK.get());
+                        output.accept(DOCItems.TRAINING_STICK.get());
 
                     })
                     .build());

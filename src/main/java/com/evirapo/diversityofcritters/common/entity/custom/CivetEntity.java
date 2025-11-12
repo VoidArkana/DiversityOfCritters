@@ -126,21 +126,137 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         return pStack.is(Items.BEEF) || pStack.is(Items.COOKED_BEEF);
     }
 
+    @Override
     protected void registerGoals() {
-        this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS);
-        this.goalSelector.addGoal(3, this.forFoodGoal);
+        super.registerGoals();
+
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
-        this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
-        this.goalSelector.addGoal(2, new CritterDrinkGoal(this));
-        this.goalSelector.addGoal(1, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF, Items.COOKED_BEEF), false));
-        this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.15D));
-        this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0D));
+
+        this.goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
+
+        this.goalSelector.addGoal(2, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
+            @Override public boolean canUse() {
+                return isFollowing() && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return isFollowing() && super.canContinueToUse();
+            }
+        });
+
+        this.goalSelector.addGoal(2, new CritterDrinkGoal(this) {
+            @Override public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
+        this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D) {
+            @Override public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
+        this.goalSelector.addGoal(3, new AnimatedAttackGoal(this, 1.25D, true, 7, 3) {
+            @Override public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
+        this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS) {
+            @Override public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        };
+        this.goalSelector.addGoal(3, this.forFoodGoal);
+
+        this.goalSelector.addGoal(3, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF, Items.COOKED_BEEF), false) {
+            @Override public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
+        this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.15D) {
+            @Override public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
+        this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
+            @Override public boolean canUse() {
+                return isWandering()
+                        && !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+            @Override public boolean canContinueToUse() {
+                return isWandering()
+                        && !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
         this.targetSelector.addGoal(7, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
         this.targetSelector.addGoal(7, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
     }
+
 
     @Override
     protected void defineSynchedData() {
