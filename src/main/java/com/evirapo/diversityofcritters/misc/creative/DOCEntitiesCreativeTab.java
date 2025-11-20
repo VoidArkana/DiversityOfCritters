@@ -15,15 +15,16 @@ public class DOCEntitiesCreativeTab {
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, DiversityOfCritters.MODID);
 
     public static final RegistryObject<CreativeModeTab> DOC_ENTITIES_TAB =
-            CREATIVE_MODE_TABS.register("docentities_tab", ()-> CreativeModeTab.builder().icon(() -> new ItemStack(DOCItems.ENTITY_TAB_ICON.get()))
+            CREATIVE_MODE_TABS.register("docentities_tab", ()-> CreativeModeTab.builder()
+                    .icon(() -> new ItemStack(DOCItems.ENTITY_TAB_ICON.get()))
                     .title(Component.translatable("creativetab.docentities_tab"))
                     .displayItems((itemDisplayParameters, output) -> {
 
-                        //output.accept(DOCItems.LION_SPAWN_EGG.get());
                         output.accept(DOCItems.CIVET_SPAWN_EGG.get());
 
                     })
                     .build());
+
 
     public static final RegistryObject<CreativeModeTab> DOC_ITEMS_TAB =
             CREATIVE_MODE_TABS.register("docitems_tab", ()-> CreativeModeTab.builder().icon(() -> new ItemStack(DOCItems.ZOO_BOOK.get()))
@@ -32,6 +33,7 @@ public class DOCEntitiesCreativeTab {
 
                         output.accept(DOCItems.ZOO_BOOK.get());
                         output.accept(DOCItems.TRAINING_STICK.get());
+                        output.accept(DOCItems.BOWL.get());
 
                     })
                     .build());

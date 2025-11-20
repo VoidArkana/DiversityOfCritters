@@ -236,14 +236,16 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
 
         this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
-                return isWandering()
+                boolean canWander = !isTame() || isWandering();
+                return canWander
                         && !isOrderedToSit()
                         && !isSleeping() && !isPreparingSleep() && !isAwakeing()
                         && !isIdleLocked()
                         && super.canUse();
             }
             @Override public boolean canContinueToUse() {
-                return isWandering()
+                boolean canWander = !isTame() || isWandering();
+                return canWander
                         && !isOrderedToSit()
                         && !isSleeping() && !isPreparingSleep() && !isAwakeing()
                         && !isIdleLocked()
@@ -411,7 +413,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         boolean onGround     = this.onGround();
 
         boolean hasDeltaMove = this.getDeltaMovement().horizontalDistanceSqr() > IDLE_MOVE_EPS;
-        boolean hasWantedNav = this.getMoveControl().hasWanted();
+        boolean hasWantedNav = !this.getNavigation().isDone(); // o isInProgress()
         boolean moving       = hasDeltaMove || hasWantedNav;
 
         boolean doingAttack  = this.isAttacking();
@@ -450,6 +452,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
             this.setTarget(null);
         }
     }
+
 
     private IdleVariant pickVariant(){
         int roll = this.random.nextInt(100);
@@ -641,7 +644,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                     this.navigation.recomputePath();
                     this.setTarget(null);
                     this.level().broadcastEntityEvent(this, (byte)7);
-                    this.setOrderedToSit(true);
+                    this.setWandering(true);
+                    this.setOrderedToSit(false);
                     this.setInSittingPose(true);
                 } else {
                     this.level().broadcastEntityEvent(this, (byte)6);

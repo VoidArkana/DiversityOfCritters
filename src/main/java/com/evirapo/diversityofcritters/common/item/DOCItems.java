@@ -1,7 +1,9 @@
 package com.evirapo.diversityofcritters.common.item;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeSpawnEggItem;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -27,6 +29,9 @@ public class DOCItems {
 
     public static final RegistryObject<Item> TRAINING_STICK = ITEM_TYPES.register("training_stick",
             ()-> new Item(new Item.Properties()));
+
+    public static final RegistryObject<Item> BOWL = ITEM_TYPES.register("bowl",
+            () -> new BlockItem(DOCBlocks.BOWL.get(), new Item.Properties()));
 
     public static void register(IEventBus eventBus) {
         ITEM_TYPES.register(eventBus);

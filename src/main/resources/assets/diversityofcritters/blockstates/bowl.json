@@ -1,0 +1,14 @@
+{
+  "variants": {
+    "content=empty":     { "model": "diversityofcritters:block/bowl" },
+    "content=meat_pre":  { "model": "diversityofcritters:block/bowl" },
+    "content=veg_pre":   { "model": "diversityofcritters:block/bowl" },
+
+    "content=meat":      { "model": "diversityofcritters:block/bowl_1" },
+    "content=veg":       { "model": "diversityofcritters:block/bowl_2" },
+    "content=mix":       { "model": "diversityofcritters:block/bowl_3" },
+    "content=water":     { "model": "diversityofcritters:block/bowl_4" }
+  }
+}
+
+

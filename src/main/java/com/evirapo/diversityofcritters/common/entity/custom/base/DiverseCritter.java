@@ -199,7 +199,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         public void tick() { if (DiverseCritter.this.canMove()) { super.tick(); } }
     }
 
-    public boolean isThirsty(){ return this.getThirst() > (this.maxThirst()/2); }
+    public boolean isThirsty() {return this.getThirst() <= (this.maxThirst()/2);}
     public boolean isHungry(){ return this.getHunger() <= (this.maxHunger()/2); }
 
     private boolean inventoryOpen;

@@ -1,5 +1,5 @@
 {
-  "creativetab.docentities_tab" : "DOC: Entity",
+  "creativetab.docentities_tab" : "DOC: Living",
   "creativetab.docitems_tab" : "DOC: Items",
 
   "entity.diversityofcritters.lion" : "Lion",
@@ -10,6 +10,7 @@
 
   "item.diversityofcritters.zoo_book" : "Zoological Book",
   "item.diversityofcritters.training_stick": "Training Stick",
+  "block.diversityofcritters.bowl": "Bowl",
 
   "screen.diversityofcritters.health" : "Health",
 
@@ -27,5 +28,6 @@
   "screen.diversityofcritters.is_baby.true": "Baby",
   "screen.diversityofcritters.is_baby.false": "Adult",
 
-  "screen.diversityofcritters.species": "Species"
+  "screen.diversityofcritters.species": "Species",
+  "container.diversityofcritters.bowl": "Bowl"
 }
