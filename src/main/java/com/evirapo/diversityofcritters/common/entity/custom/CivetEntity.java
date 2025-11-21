@@ -144,7 +144,6 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
             }
         });
 
-        /*
         this.goalSelector.addGoal(2, new FindWaterBowlGoal(this, 1.1D, 16) {
             @Override
             public boolean canUse() {
@@ -162,7 +161,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                         && super.canContinueToUse();
             }
         });
-         */
+
         this.goalSelector.addGoal(2, new CritterDrinkGoal(this) {
             @Override public boolean canUse() {
                 return !isOrderedToSit()
@@ -451,7 +450,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         boolean onGround     = this.onGround();
 
         boolean hasDeltaMove = this.getDeltaMovement().horizontalDistanceSqr() > IDLE_MOVE_EPS;
-        boolean hasWantedNav = !this.getNavigation().isDone(); // o isInProgress()
+        boolean hasWantedNav = !this.getNavigation().isDone();
         boolean moving       = hasDeltaMove || hasWantedNav;
 
         boolean doingAttack  = this.isAttacking();
@@ -590,8 +589,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         }
     }
 
-    @Override public int maxHunger() { return 500; }
-    @Override public int maxThirst() { return 500; }
+    @Override public int maxHunger() { return 1000; }
+    @Override public int maxThirst() { return 1000; }
 
     @Override public boolean isAttacking() { return this.entityData.get(IS_ATTACKING); }
     @Override public void setAttacking(boolean v) { this.entityData.set(IS_ATTACKING, v); }
@@ -653,7 +652,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     @Override public Set<EntityType<?>> getInterruptingEntityTypes() { return Collections.emptySet(); }
     @Override public boolean shouldInterruptSleepDueTo(LivingEntity nearby) { return nearby.getMobType() == MobType.UNDEAD; }
     @Override public boolean shouldWakeOnPlayerProximity() { return false; }
-    @Override protected boolean getDefaultDiurnal() { return false; }
+    @Override protected boolean getDefaultDiurnal() { return true; }
 
     private int tamingFeedsLeft = 0;
 

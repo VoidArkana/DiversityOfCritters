@@ -162,14 +162,14 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             sleepController.tick(this.tickCount);
         }
 
-        if (this.getHunger()>0){
+        if (this.getHunger() > 0 && this.tickCount % 2 == 0) {
             this.prevHunger = this.getHunger();
-            this.setHunger(prevHunger-1);
+            this.setHunger(prevHunger - 1);
         }
 
-        if (this.getThirst()>0){
+        if (this.getThirst() > 0) {
             this.prevThirst = this.getThirst();
-            this.setThirst(prevThirst-1);
+            this.setThirst(prevThirst - 1);
         }
 
         if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){

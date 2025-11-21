@@ -19,7 +19,11 @@ public class CritterDrinkGoal extends Goal {
     private BlockPos waterPos;
     private BlockPos targetPos;
     private int drinkTime = 0;
-    private int executionChance = 30;
+
+    // ---- NUEVO: probabilidad de intentar beber (70%) ----
+    private static final float DRINK_CHANCE = 0.7F;
+
+    private int executionChance = 30; // (sigue aquí por si luego lo quieres usar)
     private Direction[] HORIZONTALS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 
     public CritterDrinkGoal(DiverseCritter creature) {
@@ -27,8 +31,18 @@ public class CritterDrinkGoal extends Goal {
         this.critter = creature;
     }
 
+    @Override
     public boolean canUse() {
-        if (critter.isThirsty()){
+        // *** IMPORTANTE: se mantiene EXACTAMENTE tu lógica actual ***
+        // Solo entra si NO está sediento
+        if (critter.isThirsty()) {
+            return false;
+        }
+
+        // ---- Probabilidad: solo 70% de las veces que pasa por aquí intentará beber ----
+        // random.nextFloat() devuelve [0.0, 1.0)
+        // Permitimos el goal solo si < 0.7  →  70% de probabilidad
+        if (critter.getRandom().nextFloat() >= DRINK_CHANCE) {
             return false;
         }
 
@@ -41,6 +55,7 @@ public class CritterDrinkGoal extends Goal {
         return false;
     }
 
+    @Override
     public void stop() {
         targetPos = null;
         waterPos = null;
@@ -50,6 +65,7 @@ public class CritterDrinkGoal extends Goal {
         this.critter.getNavigation().stop();
     }
 
+    @Override
     public void tick() {
         if (targetPos != null && waterPos != null) {
             double dist = this.critter.distanceToSqr(Vec3.atCenterOf(waterPos));
@@ -72,18 +88,25 @@ public class CritterDrinkGoal extends Goal {
                     this.critter.gameEvent(GameEvent.BLOCK_ACTIVATE);
                     this.critter.playSound(SoundEvents.GENERIC_SWIM, 0.7F, 0.5F + critter.getRandom().nextFloat());
                 }
-                this.critter.getLookControl().setLookAt((double)this.waterPos.getX() + 0.5D, (double)(this.waterPos.getY()-1.5), (double)this.waterPos.getZ() + 0.5D, 10.0F, (float)this.critter.getMaxHeadXRot());
+                this.critter.getLookControl().setLookAt(
+                        (double)this.waterPos.getX() + 0.5D,
+                        (double)(this.waterPos.getY()-1.5),
+                        (double)this.waterPos.getZ() + 0.5D,
+                        10.0F,
+                        (float)this.critter.getMaxHeadXRot()
+                );
                 drinkTime++;
                 if(drinkTime > 100){
                     this.stop();
                 }
-            }else{
-                this.critter.getNavigation().moveTo(waterPos.getX(), waterPos.getY(), waterPos.getZ(), 1.2D);
+            } else {
+                this.critter.getNavigation().moveTo(
+                        waterPos.getX(), waterPos.getY(), waterPos.getZ(), 1.2D);
             }
-
         }
     }
 
+    @Override
     public boolean canContinueToUse() {
         if(critter.getThirst()>=critter.maxThirst()){
             return false;
@@ -96,8 +119,13 @@ public class CritterDrinkGoal extends Goal {
         final RandomSource random = this.critter.getRandom();
         int range = 32;
         for (int i = 0; i < 15; i++) {
-            BlockPos blockpos1 = this.critter.blockPosition().offset(random.nextInt(range) - range / 2, 3, random.nextInt(range) - range / 2);
-            while (this.critter.level().isEmptyBlock(blockpos1) && blockpos1.getY() > critter.level().getMinBuildHeight()) {
+            BlockPos blockpos1 = this.critter.blockPosition().offset(
+                    random.nextInt(range) - range / 2,
+                    3,
+                    random.nextInt(range) - range / 2
+            );
+            while (this.critter.level().isEmptyBlock(blockpos1)
+                    && blockpos1.getY() > critter.level().getMinBuildHeight()) {
                 blockpos1 = blockpos1.below();
             }
             if (isConnectedToLand(blockpos1)) {
@@ -111,7 +139,8 @@ public class CritterDrinkGoal extends Goal {
         if (this.critter.level().getFluidState(pos).is(FluidTags.WATER)) {
             for (Direction dir : HORIZONTALS) {
                 BlockPos offsetPos = pos.relative(dir);
-                if (this.critter.level().getFluidState(offsetPos).isEmpty() && this.critter.level().getFluidState(offsetPos.above()).isEmpty()) {
+                if (this.critter.level().getFluidState(offsetPos).isEmpty()
+                        && this.critter.level().getFluidState(offsetPos.above()).isEmpty()) {
                     return true;
                 }
             }
@@ -123,7 +152,8 @@ public class CritterDrinkGoal extends Goal {
         if (this.critter.level().getFluidState(pos).is(FluidTags.WATER)) {
             for (Direction dir : HORIZONTALS) {
                 BlockPos offsetPos = pos.relative(dir);
-                if (this.critter.level().getFluidState(offsetPos).isEmpty() && this.critter.level().getFluidState(offsetPos.above()).isEmpty()) {
+                if (this.critter.level().getFluidState(offsetPos).isEmpty()
+                        && this.critter.level().getFluidState(offsetPos.above()).isEmpty()) {
                     return offsetPos;
                 }
             }

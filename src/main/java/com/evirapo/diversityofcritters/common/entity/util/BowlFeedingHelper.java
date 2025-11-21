@@ -28,7 +28,7 @@ public class BowlFeedingHelper {
         };
     }
 
-    public static boolean hasWater(Level level, BlockPos pos) {
+    public static boolean hasWaterFor(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BowlBlock)) return false;
 
@@ -123,7 +123,6 @@ public class BowlFeedingHelper {
         return false;
     }
 
-
     public static boolean consumeWaterFor(DiverseCritter critter, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BowlBlock)) {
@@ -155,14 +154,12 @@ public class BowlFeedingHelper {
             return false;
         }
 
-        // Antes de limpiar, muestra qué hay
-        Container inv = bowlBe.getInventory();
-        System.out.println("[BOWL-WATER] Inventario antes de limpiar:");
-        for (int i = 0; i < inv.getContainerSize(); i++) {
-            ItemStack stack = inv.getItem(i);
-            if (!stack.isEmpty()) {
-                System.out.println("  Slot " + i + " -> " + stack);
-            }
+        int charges = bowlBe.getWaterCharges();
+        if (charges <= 0) {
+            System.out.println("[BOWL-WATER] Sin cargas de agua, vaciando bowl.");
+            level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.EMPTY), 3);
+            bowlBe.setWaterCharges(0);
+            return false;
         }
 
         int before = critter.getThirst();
@@ -170,19 +167,39 @@ public class BowlFeedingHelper {
         int after = critter.getThirst();
         System.out.println("[BOWL-WATER] Thirst " + before + " -> " + after);
 
-        // Dejar el bowl vacío visualmente
-        level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.EMPTY), 3);
+        // Consumir 1 carga
+        bowlBe.consumeWaterCharge();
+        charges = bowlBe.getWaterCharges();
+        System.out.println("[BOWL-WATER] Carga consumida. Cargas restantes=" + charges);
 
-        // Limpiar inventario del bowl
-        for (int i = 0; i < inv.getContainerSize(); i++) {
-            inv.setItem(i, ItemStack.EMPTY);
+        if (charges <= 0) {
+            // Se agotó "un balde": convertir el agua del inventario en recipientes vacíos
+            Container inv = bowlBe.getInventory();
+            for (int i = 0; i < inv.getContainerSize(); i++) {
+                ItemStack stack = inv.getItem(i);
+                if (stack.isEmpty()) continue;
+
+                if (BowlBlockEntity.BowlLogic.isWater(stack)) {
+                    // Si es balde de agua -> balde vacío
+                    if (stack.is(net.minecraft.world.item.Items.WATER_BUCKET)) {
+                        int count = stack.getCount();
+                        inv.setItem(i, new ItemStack(net.minecraft.world.item.Items.BUCKET, count));
+                    }
+                    // Si es poción de agua -> botella de vidrio
+                    else if (stack.is(net.minecraft.world.item.Items.POTION)) {
+                        int count = stack.getCount();
+                        inv.setItem(i, new ItemStack(net.minecraft.world.item.Items.GLASS_BOTTLE, count));
+                    }
+                }
+            }
+            inv.setChanged();
+
+            // Vaciar visualmente el bowl
+            level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.EMPTY), 3);
+            bowlBe.setWaterCharges(0);
+            System.out.println("[BOWL-WATER] Bowl vacío en " + pos.toShortString());
         }
-        inv.setChanged();
-
-        System.out.println("[BOWL-WATER] Bowl vaciado en " + pos.toShortString());
 
         return true;
     }
-
 }
-
