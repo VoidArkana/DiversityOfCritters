@@ -19,32 +19,38 @@ public class FindFoodBowlGoal extends MoveToBlockGoal {
         this.critter = critter;
     }
 
-    // Aumentamos un poco la distancia aceptada.
-    // Así el goal considera "llegado" antes de empujarla justo al centro del bowl.
     @Override
     public double acceptedDistance() {
-        return 1.4D; // prueba 1.4; si aún se mete encima, súbelo a 1.6
+        // Consideramos "llegado" algo antes de estar encima del bowl
+        return 1.4D;
     }
 
     @Override
     public boolean canUse() {
         if (critter.level().isClientSide()) return false;
+
+        // Solo si tiene hambre
         if (!critter.isHungry()) return false;
-        if (!critter.canMove())  return false;
-        return super.canUse();
+
+        boolean base = super.canUse();
+        if (base) {
+            System.out.println("[BOWL-GOAL] canUse=TRUE pos=" + critter.blockPosition()
+                    + " hunger=" + critter.getHunger());
+        }
+        return base;
     }
 
     @Override
     public boolean canContinueToUse() {
         if (critter.level().isClientSide()) return false;
-        if (!critter.canMove()) return false;
 
+        // Si aún NO llega, seguimos mientras el MoveToBlockGoal quiera
         if (!this.isReachedTarget()) {
-            // Aún no llega → sigue pathing mientras tenga hambre
             return super.canContinueToUse() && critter.isHungry();
         }
 
-        // Ya está lo bastante cerca del bowl
+        // Ya estamos lo bastante cerca del bowl:
+        // seguimos mientras el bowl tenga comida y no esté lleno de hunger
         boolean hasFood = BowlFeedingHelper.hasFoodFor(critter, (Level) critter.level(), this.blockPos);
         boolean notFull = critter.getHunger() < critter.maxHunger();
         return hasFood && notFull;
@@ -54,15 +60,15 @@ public class FindFoodBowlGoal extends MoveToBlockGoal {
     public void start() {
         super.start();
         eatTimer = 0;
-        critter.setIsDrinking(true); // usamos esto para la anim de comer/beber
         critter.debugGoalMessage("FindFoodBowlGoal", "START");
+        critter.setIsDrinking(false); // 👈 todavía no bloqueamos, hasta llegar
     }
 
     @Override
     public void stop() {
         super.stop();
         eatTimer = 0;
-        critter.setIsDrinking(false);
+        critter.setIsDrinking(false); // 👈 desbloquear al terminar
         critter.debugGoalMessage("FindFoodBowlGoal", "STOP");
     }
 
@@ -77,19 +83,21 @@ public class FindFoodBowlGoal extends MoveToBlockGoal {
 
     @Override
     public void tick() {
-        // si aún no estamos dentro de acceptedDistance() → deja que MoveToBlockGoal haga su trabajo
+        // Mientras no esté dentro de acceptedDistance(), dejamos que MoveToBlockGoal haga el path
         if (!this.isReachedTarget()) {
             super.tick();
             return;
         }
 
-        // --- YA ESTAMOS LO BASTANTE CERCA DEL BOWL ---
+        // ---------- YA ESTÁ LO BASTANTE CERCA DEL BOWL ----------
 
-        // 1) detener navegación y movimiento lateral
+        // Bloqueamos movimiento real
+        critter.setIsDrinking(true);
         critter.getNavigation().stop();
-        critter.setDeltaMovement(0, critter.getDeltaMovement().y, 0);
+        Vec3 dm = critter.getDeltaMovement();
+        critter.setDeltaMovement(0, dm.y, 0);
 
-        // 2) mira al bowl para evitar giros raros
+        // Mirar hacia el bowl
         Vec3 bowlCenter = Vec3.atCenterOf(this.blockPos);
         critter.getLookControl().setLookAt(
                 bowlCenter.x,
@@ -97,7 +105,7 @@ public class FindFoodBowlGoal extends MoveToBlockGoal {
                 bowlCenter.z
         );
 
-        // 3) comer cada cierto tiempo
+        // Comer cada cierto tiempo
         eatTimer++;
         if (eatTimer % EAT_INTERVAL == 0) {
             System.out.println("[BOWL-GOAL] Intentando comer en " + this.blockPos +
@@ -110,11 +118,10 @@ public class FindFoodBowlGoal extends MoveToBlockGoal {
 
             if (!ate || critter.getHunger() >= critter.maxHunger()) {
                 System.out.println("[BOWL-GOAL] Fin de comida (sin comida o lleno).");
+                // al hacer stop(), setIsDrinking(false) y el goal termina
                 this.stop();
             }
         }
     }
 }
-
-
 

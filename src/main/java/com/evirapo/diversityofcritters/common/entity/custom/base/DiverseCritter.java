@@ -194,9 +194,21 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     // ---------- CONTROLS ----------
     public class CritterLookControl extends LookControl {
         public CritterLookControl() { super(DiverseCritter.this); }
-        public void tick() { if (!DiverseCritter.this.isSleeping()) { super.tick(); } }
-        protected boolean resetXRotOnTick() { return !DiverseCritter.this.isCrouching(); }
+
+        @Override
+        public void tick() {
+            if (!DiverseCritter.this.isSleeping()) {
+                super.tick();
+            }
+        }
+
+        @Override
+        protected boolean resetXRotOnTick() {
+            return !DiverseCritter.this.isCrouching();
+        }
     }
+
+
 
     public class CritterMoveControl extends MoveControl {
         public CritterMoveControl() { super(DiverseCritter.this); }
@@ -344,9 +356,13 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     protected boolean isIdleLocked() { return false; }
 
     public boolean canMove() {
-        return !this.isSleeping() && !this.isAwakeing() && !this.isPreparingSleep()
-                && !this.isIdleLocked() && !this.isOrderedToSit();
+        return !this.isSleeping()
+                && !this.isAwakeing()
+                && !this.isPreparingSleep()
+                && !this.isIdleLocked()
+                && !this.isOrderedToSit();
     }
+
 
     @Override
     public void aiStep() {
@@ -358,7 +374,12 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     @Override
     public void travel(Vec3 travelVector) {
-        if (isSleeping() || isPreparingSleep() || isAwakeing() || isIdleLocked() || this.isOrderedToSit()) {
+        if (isSleeping()
+                || isPreparingSleep()
+                || isAwakeing()
+                || isIdleLocked()
+                || this.isOrderedToSit()
+                || this.IsDrinking()) {
             if (!level().isClientSide) {
                 this.getNavigation().stop();
                 this.getMoveControl().setWantedPosition(this.getX(), this.getY(), this.getZ(), 0.0D);
@@ -370,6 +391,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
         super.travel(travelVector);
     }
+
 
 
     @Override
