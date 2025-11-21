@@ -1,4 +1,4 @@
-package com.evirapo.diversityofcritters.common.entity.util;
+package com.evirapo.diversityofcritters.common.entity.util.sleep;
 
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.world.entity.AnimationState;
@@ -11,7 +11,7 @@ import java.util.List;
 public class SleepCycleController<T extends DiverseCritter & ISleepingEntity> {
 
     // === DEBUG ===
-    private static final boolean DEBUG_SLEEP = true;
+    private static final boolean DEBUG_SLEEP = false;
     private void dlog(String msg) {
         if (DEBUG_SLEEP && !entity.level().isClientSide()) {
             System.out.println("[SLEEP][SVR][" + entity.getName().getString() + "#" + entity.getId() + "] " + msg);

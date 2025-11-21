@@ -1,4 +1,4 @@
-package com.evirapo.diversityofcritters.common.entity.util;
+package com.evirapo.diversityofcritters.common.entity.util.sleep;
 
 import net.minecraft.world.entity.EntityType;
 

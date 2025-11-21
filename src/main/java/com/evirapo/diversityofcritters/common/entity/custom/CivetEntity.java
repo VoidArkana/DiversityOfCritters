@@ -4,9 +4,10 @@ import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.custom.base.IAnimatedAttacker;
-import com.evirapo.diversityofcritters.common.entity.util.ISleepAwareness;
-import com.evirapo.diversityofcritters.common.entity.util.ISleepThreatEvaluator;
-import com.evirapo.diversityofcritters.common.entity.util.SleepCycleController;
+import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.entity.util.sleep.ISleepAwareness;
+import com.evirapo.diversityofcritters.common.entity.util.sleep.ISleepThreatEvaluator;
+import com.evirapo.diversityofcritters.common.entity.util.sleep.SleepCycleController;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -143,6 +144,25 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
             }
         });
 
+        /*
+        this.goalSelector.addGoal(2, new FindWaterBowlGoal(this, 1.1D, 16) {
+            @Override
+            public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+
+            @Override
+            public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+         */
         this.goalSelector.addGoal(2, new CritterDrinkGoal(this) {
             @Override public boolean canUse() {
                 return !isOrderedToSit()
@@ -181,6 +201,24 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                         && super.canUse();
             }
             @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
+        this.goalSelector.addGoal(3, new FindFoodBowlGoal(this, 1.1D, 16) {
+            @Override
+            public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+
+            @Override
+            public boolean canContinueToUse() {
                 return !isOrderedToSit()
                         && !isSleeping() && !isPreparingSleep() && !isAwakeing()
                         && !isIdleLocked()
@@ -552,8 +590,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         }
     }
 
-    @Override public int maxHunger() { return 20*60*100; }
-    @Override public int maxThirst() { return 20*60*100; }
+    @Override public int maxHunger() { return 500; }
+    @Override public int maxThirst() { return 500; }
 
     @Override public boolean isAttacking() { return this.entityData.get(IS_ATTACKING); }
     @Override public void setAttacking(boolean v) { this.entityData.set(IS_ATTACKING, v); }
@@ -681,4 +719,19 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         super.readAdditionalSaveData(tag);
         this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
     }
+
+
+    @Override
+    public CritterDietConfig getDietConfig() {
+        return new CritterDietConfig(
+                true,
+                true,
+                true,
+                40,
+                30,
+                50,
+                60
+        );
+    }
+
 }

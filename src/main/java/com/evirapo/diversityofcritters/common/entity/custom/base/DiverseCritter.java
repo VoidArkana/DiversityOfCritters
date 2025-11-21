@@ -1,8 +1,9 @@
 package com.evirapo.diversityofcritters.common.entity.custom.base;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
-import com.evirapo.diversityofcritters.common.entity.util.ISleepingEntity;
-import com.evirapo.diversityofcritters.common.entity.util.SleepCycleController;
+import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.entity.util.sleep.ISleepingEntity;
+import com.evirapo.diversityofcritters.common.entity.util.sleep.SleepCycleController;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
@@ -20,10 +21,6 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.control.LookControl;
 import net.minecraft.world.entity.ai.control.MoveControl;
-import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
-import net.minecraft.world.entity.ai.goal.SitWhenOrderedToGoal;
-import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
-import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -128,10 +125,17 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public int getThirstPercentage() { return (100 * this.getThirst())/this.maxThirst(); }
 
     public int getHunger() { return this.entityData.get(HUNGER); }
-    public void setHunger(int hunger) { this.entityData.set(HUNGER, hunger); }
+    public void setHunger(int hunger) {
+        int clamped = Math.max(0, Math.min(maxHunger(), hunger));
+        this.entityData.set(HUNGER, clamped);
+    }
 
     public int getThirst() { return this.entityData.get(THIRST); }
-    public void setThirst(int thirst) { this.entityData.set(THIRST, thirst); }
+
+    public void setThirst(int thirst) {
+        int clamped = Math.max(0, Math.min(maxThirst(), thirst));
+        this.entityData.set(THIRST, clamped);
+    }
 
     public Boolean IsDrinking() { return this.entityData.get(DRINKING); }
     public void setIsDrinking(Boolean isDrinking) { this.entityData.set(DRINKING, isDrinking); }
@@ -199,8 +203,12 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         public void tick() { if (DiverseCritter.this.canMove()) { super.tick(); } }
     }
 
-    public boolean isThirsty() {return this.getThirst() <= (this.maxThirst()/2);}
-    public boolean isHungry(){ return this.getHunger() <= (this.maxHunger()/2); }
+    public boolean isThirsty() {
+        return getThirst() <= (int)(maxThirst() * 0.5f);
+    }
+    public boolean isHungry() {
+        return getHunger() <= (int)(maxHunger() * 0.5f);
+    }
 
     private boolean inventoryOpen;
     private DiverseInventory inventory;
@@ -335,7 +343,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     protected boolean isIdleLocked() { return false; }
 
-    boolean canMove() {
+    public boolean canMove() {
         return !this.isSleeping() && !this.isAwakeing() && !this.isPreparingSleep()
                 && !this.isIdleLocked() && !this.isOrderedToSit();
     }
@@ -430,6 +438,24 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             }
         } else {
             if (sitState.isStarted()) sitState.stop();
+        }
+    }
+
+    //DIET
+
+    public abstract CritterDietConfig getDietConfig();
+
+    public void debugGoalMessage(String goalName, String state) {
+        if (this.level().isClientSide()) return;
+
+        String base = "[BOWL-GOAL][" + this.getName().getString() + "] " + goalName + " " + state;
+
+        System.out.println(base);
+
+        for (Player player : this.level().players()) {
+            if (player.distanceTo(this) < 32.0F) {
+                player.displayClientMessage(Component.literal(base), true);
+            }
         }
     }
 
