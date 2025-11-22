@@ -20,11 +20,23 @@ public class CritterDrinkGoal extends Goal {
     private BlockPos targetPos;
     private int drinkTime = 0;
 
-    // ---- NUEVO: probabilidad de intentar beber (70%) ----
+    // ---- Probabilidad de intentar beber (sigue igual) ----
     private static final float DRINK_CHANCE = 0.7F;
 
-    private int executionChance = 30; // (sigue aquí por si luego lo quieres usar)
+    private int executionChance = 30; // por si luego lo quieres usar
     private Direction[] HORIZONTALS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
+
+    // ==== NUEVOS PARÁMETROS DE BALANCE PARA AGUA NATURAL ====
+
+    // Cada cuántos ticks se toma un “sorbo” de agua natural
+    private static final int NATURAL_WATER_SIP_INTERVAL_TICKS = 20; // 1 segundo (20 ticks)
+
+    // Cuánto restaura cada sorbo de agua natural
+    private static final int NATURAL_WATER_RESTORE_PER_SIP = 50;    // 20 sorbos -> 1000 sed
+
+    // Tiempo máximo bebiendo seguido desde una misma posición (por seguridad)
+    private static final int MAX_DRINK_TIME_TICKS = 20 * 25; // 25 s de margen aprox
+
 
     public CritterDrinkGoal(DiverseCritter creature) {
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -33,15 +45,12 @@ public class CritterDrinkGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        // *** IMPORTANTE: se mantiene EXACTAMENTE tu lógica actual ***
-        // Solo entra si NO está sediento
+        // Solo entra si NO está “sediento” según tu regla (solo top-up casual)
         if (critter.isThirsty()) {
             return false;
         }
 
-        // ---- Probabilidad: solo 70% de las veces que pasa por aquí intentará beber ----
-        // random.nextFloat() devuelve [0.0, 1.0)
-        // Permitimos el goal solo si < 0.7  →  70% de probabilidad
+        // Probabilidad del 70% de activar cuando pasa por aquí
         if (critter.getRandom().nextFloat() >= DRINK_CHANCE) {
             return false;
         }
@@ -72,22 +81,35 @@ public class CritterDrinkGoal extends Goal {
             if (dist > 2 && this.critter.IsDrinking()) {
                 this.critter.setIsDrinking(false);
             }
+
             if (dist <= 1F) {
+                // ---- Ya está junto al agua ----
                 double d0 = waterPos.getX() + 0.5D - this.critter.getX();
                 double d2 = waterPos.getZ() + 0.5D - this.critter.getZ();
                 float yaw = (float)(Mth.atan2(d2, d0) * (double) Mth.RAD_TO_DEG) - 90.0F;
                 this.critter.setYRot(yaw);
                 this.critter.yHeadRot = yaw;
                 this.critter.yBodyRot = yaw;
+
                 this.critter.getNavigation().stop();
                 this.critter.setIsDrinking(true);
                 this.critter.setDrinkPos(waterPos);
-                int prevThirst = critter.getThirst();
-                this.critter.setThirst(Math.min(prevThirst + (critter.maxThirst()/50), critter.maxThirst()));
-                if(drinkTime % 10 == 0){
+
+                drinkTime++;
+
+                // === NUEVO: un sorbo cada NATURAL_WATER_SIP_INTERVAL_TICKS ===
+                if (drinkTime % NATURAL_WATER_SIP_INTERVAL_TICKS == 0) {
+                    int prevThirst = critter.getThirst();
+                    int newThirst  = Math.min(prevThirst + NATURAL_WATER_RESTORE_PER_SIP, critter.maxThirst());
+                    this.critter.setThirst(newThirst);
+
+                    // Evento + sonido sincronizados con el sorbo
                     this.critter.gameEvent(GameEvent.BLOCK_ACTIVATE);
-                    this.critter.playSound(SoundEvents.GENERIC_SWIM, 0.7F, 0.5F + critter.getRandom().nextFloat());
+                    this.critter.playSound(SoundEvents.GENERIC_SWIM, 0.7F,
+                            0.5F + critter.getRandom().nextFloat());
                 }
+
+                // mirada hacia el agua (sigues igual)
                 this.critter.getLookControl().setLookAt(
                         (double)this.waterPos.getX() + 0.5D,
                         (double)(this.waterPos.getY()-1.5),
@@ -95,11 +117,15 @@ public class CritterDrinkGoal extends Goal {
                         10.0F,
                         (float)this.critter.getMaxHeadXRot()
                 );
-                drinkTime++;
-                if(drinkTime > 100){
+
+                // cortar si se llenó o pasó demasiado tiempo
+                if (critter.getThirst() >= critter.maxThirst()
+                        || drinkTime > MAX_DRINK_TIME_TICKS) {
                     this.stop();
                 }
+
             } else {
+                // Todavía se está acercando al borde del agua
                 this.critter.getNavigation().moveTo(
                         waterPos.getX(), waterPos.getY(), waterPos.getZ(), 1.2D);
             }
@@ -108,7 +134,7 @@ public class CritterDrinkGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if(critter.getThirst()>=critter.maxThirst()){
+        if (critter.getThirst() >= critter.maxThirst()) {
             return false;
         }
         return targetPos != null && !this.critter.isInWater();

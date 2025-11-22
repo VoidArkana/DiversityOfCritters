@@ -21,10 +21,6 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider {
 
-    /**
-     * Configurable: cuántas "cargas" de agua tiene un bowl cuando está en estado WATER.
-     * Por ahora 10 para test; luego puedes moverlo a tu config.
-     */
     public static int WATER_CHARGES_PER_BOWL = 10;
 
     private int waterCharges = 0;

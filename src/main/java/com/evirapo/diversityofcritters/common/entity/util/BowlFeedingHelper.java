@@ -50,7 +50,7 @@ public class BowlFeedingHelper {
                 " hunger=" + critter.getHunger() +
                 " at " + pos.toShortString());
 
-        // Solo verificar si el tipo de bowl es aceptado por la dieta
+        // 1) Verificar si la dieta acepta este tipo de bowl
         boolean accepts;
         switch (content) {
             case MEAT -> accepts = diet.acceptsMeat;
@@ -67,8 +67,18 @@ public class BowlFeedingHelper {
             return false;
         }
 
-        // Valor fijo por ítem
-        final int RESTORE_PER_ITEM = 40;
+        // 2) Cuánto restaura cada ítem, según el tipo de bowl
+        int restorePerItem = switch (content) {
+            case MEAT -> diet.hungerPerMeatBowl;  // 32 en tu civeta
+            case VEG  -> diet.hungerPerVegBowl;   // 10
+            case MIX  -> diet.hungerPerMixBowl;   // 30
+            default   -> 0;
+        };
+
+        if (restorePerItem <= 0) {
+            System.out.println("[BOWL-FOOD] restorePerItem <= 0, nada que curar");
+            return false;
+        }
 
         BlockEntity be = level.getBlockEntity(pos);
         if (!(be instanceof BowlBlockEntity bowlBe)) {
@@ -109,7 +119,7 @@ public class BowlFeedingHelper {
             }
 
             int before = critter.getHunger();
-            critter.setHunger(before + RESTORE_PER_ITEM);
+            critter.setHunger(before + restorePerItem);
             int after = critter.getHunger();
 
             System.out.println("[BOWL-FOOD] Hunger " + before + " -> " + after);
@@ -122,6 +132,7 @@ public class BowlFeedingHelper {
         System.out.println("[BOWL-FOOD] No se encontró ítem compatible en el inventario");
         return false;
     }
+
 
     public static boolean consumeWaterFor(DiverseCritter critter, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);

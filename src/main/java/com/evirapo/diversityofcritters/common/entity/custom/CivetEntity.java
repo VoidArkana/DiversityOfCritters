@@ -321,11 +321,34 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     public void aiStep() {
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
         if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS)) {
-            this.setHunger(Math.min(this.getHunger()+this.maxHunger()/4, this.maxHunger()));
-            this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), 0.0, 0.0, 0.0);
-            this.level().playSound(null, new BlockPos((int) this.getX(), (int) this.getY(), (int) this.getZ()), SoundEvents.GENERIC_EAT, SoundSource.AMBIENT);
+
+            // --- NUEVO: carne del suelo = 25% más que el bowl de carne ---
+            int baseBowl = this.getDietConfig().hungerPerMeatBowl; // 32 en tu config
+            int restore  = baseBowl + baseBowl / 4;                 // +25% -> 40
+
+            int before = this.getHunger();
+            this.setHunger(Math.min(before + restore, this.maxHunger()));
+            int after = this.getHunger();
+
+            this.level().addParticle(
+                    new ItemParticleOption(ParticleTypes.ITEM, stack),
+                    this.getX(), this.getY(), this.getZ(),
+                    0.0, 0.0, 0.0
+            );
+            this.level().playSound(
+                    null,
+                    new BlockPos((int) this.getX(), (int) this.getY(), (int) this.getZ()),
+                    SoundEvents.GENERIC_EAT,
+                    SoundSource.AMBIENT
+            );
+
             stack.shrink(1);
-            if (stack.isEmpty()) this.setItemInHand(InteractionHand.MAIN_HAND, Items.AIR.getDefaultInstance());
+            if (stack.isEmpty()) {
+                this.setItemInHand(InteractionHand.MAIN_HAND, Items.AIR.getDefaultInstance());
+            }
+
+            System.out.println("[CIVET-MEAT-FLOOR] Hunger " + before + " -> " + after
+                    + " (meat item from floor, 25% > bowl)");
         }
 
         if (isHungry() && (double)this.random.nextFloat() <= 0.2) triggerFoodSearch();
@@ -589,8 +612,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         }
     }
 
-    @Override public int maxHunger() { return 1000; }
-    @Override public int maxThirst() { return 1000; }
+    @Override public int maxHunger() { return 4000; }
+    @Override public int maxThirst() { return 4000; }
 
     @Override public boolean isAttacking() { return this.entityData.get(IS_ATTACKING); }
     @Override public void setAttacking(boolean v) { this.entityData.set(IS_ATTACKING, v); }
@@ -726,10 +749,10 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                 true,
                 true,
                 true,
-                40,
+                32,
+                10,
                 30,
-                50,
-                60
+                33
         );
     }
 
