@@ -37,7 +37,6 @@ public class BowlFeedingHelper {
         return content == BowlContent.WATER;
     }
 
-
     public static boolean consumeFoodFor(DiverseCritter critter, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BowlBlock)) {
@@ -132,7 +131,6 @@ public class BowlFeedingHelper {
         return false;
     }
 
-
     public static boolean consumeWaterFor(DiverseCritter critter, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BowlBlock)) {
@@ -165,20 +163,11 @@ public class BowlFeedingHelper {
         }
 
         int chargesBefore = bowlBe.getWaterCharges();
-
         if (chargesBefore <= 0) {
-            int waterUnits = countWaterUnits(bowlBe);
-            if (waterUnits <= 0) {
-                System.out.println("[BOWL-WATER] Sin recipientes con agua, bowl vacío.");
-                level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.EMPTY), 3);
-                bowlBe.setWaterCharges(0);
-                return false;
-            }
-
-            chargesBefore = waterUnits * BowlBlockEntity.WATER_CHARGES_PER_BUCKET;
-            bowlBe.setWaterCharges(chargesBefore);
-            System.out.println("[BOWL-WATER] Resync waterCharges=" + chargesBefore +
-                    " (waterUnits=" + waterUnits + ")");
+            System.out.println("[BOWL-WATER] Sin cargas de agua, vaciando bowl.");
+            level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.EMPTY), 3);
+            bowlBe.setWaterCharges(0);
+            return false;
         }
 
         int before = critter.getThirst();
@@ -191,32 +180,35 @@ public class BowlFeedingHelper {
         System.out.println("[BOWL-WATER] Carga consumida. Cargas restantes=" + chargesAfter);
 
         if (chargesAfter < chargesBefore
-                && chargesAfter % BowlBlockEntity.WATER_CHARGES_PER_BUCKET == 0) {
+                && chargesAfter % BowlBlockEntity.WATER_CHARGES_PER_BOTTLE == 0) {
             consumeOneWaterContainer(bowlBe, level, pos);
         }
 
-        int unitsAfter = countWaterUnits(bowlBe);
-        if (unitsAfter <= 0) {
-            level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.EMPTY), 3);
-            bowlBe.setWaterCharges(0);
-            System.out.println("[BOWL-WATER] Bowl totalmente vacío en " + pos.toShortString());
+        if (chargesAfter <= 0) {
+            Container inv = bowlBe.getInventory();
+            int waterUnits = 0;
+            for (int i = 0; i < inv.getContainerSize(); i++) {
+                ItemStack s = inv.getItem(i);
+                if (!s.isEmpty() && BowlBlockEntity.BowlLogic.isWater(s)) {
+                    waterUnits += s.getCount();
+                }
+            }
+
+            if (waterUnits <= 0) {
+                level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.EMPTY), 3);
+                bowlBe.setWaterCharges(0);
+                System.out.println("[BOWL-WATER] Bowl vacío en " + pos.toShortString());
+            } else {
+                int newCharges = waterUnits * BowlBlockEntity.WATER_CHARGES_PER_BOTTLE;
+                bowlBe.setWaterCharges(newCharges);
+                level.setBlock(pos, state.setValue(BowlBlock.CONTENT, BowlContent.WATER), 3);
+                System.out.println("[BOWL-WATER] Había más botellas, recargando charges=" + newCharges);
+            }
         }
 
         return true;
     }
 
-    private static int countWaterUnits(BowlBlockEntity bowlBe) {
-        Container inv = bowlBe.getInventory();
-        int units = 0;
-        for (int i = 0; i < inv.getContainerSize(); i++) {
-            ItemStack s = inv.getItem(i);
-            if (s.isEmpty()) continue;
-            if (BowlBlockEntity.BowlLogic.isWater(s)) {
-                units += s.getCount();
-            }
-        }
-        return units;
-    }
 
     private static void consumeOneWaterContainer(BowlBlockEntity bowlBe, Level level, BlockPos pos) {
         Container inv = bowlBe.getInventory();
@@ -226,16 +218,6 @@ public class BowlFeedingHelper {
             if (stack.isEmpty()) continue;
 
             if (!BowlBlockEntity.BowlLogic.isWater(stack)) continue;
-
-            if (stack.is(Items.WATER_BUCKET)) {
-                stack.shrink(1);
-                if (stack.isEmpty()) {
-                    inv.setItem(i, ItemStack.EMPTY);
-                }
-                placeOneItem(inv, new ItemStack(Items.BUCKET));
-                inv.setChanged();
-                return;
-            }
 
             if (stack.is(Items.POTION)) {
                 stack.shrink(1);
