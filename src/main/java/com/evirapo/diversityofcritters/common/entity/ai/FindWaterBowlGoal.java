@@ -17,12 +17,11 @@ public class FindWaterBowlGoal extends Goal {
     private final double speed;
     private final int searchRadius;
 
-    private BlockPos bowlPos;        // posición del bowl con agua
+    private BlockPos bowlPos;
     private int drinkTimer = 0;
-    private static final int DRINK_INTERVAL = 40; // 2 segundos aprox
+    private static final int DRINK_INTERVAL = 40;
 
-    // radio real en bloques para considerarse “junto” al bowl
-    private static final double MAX_DRINK_DIST_SQ = 1.0D; // distancia^2 (1 bloque)
+    private static final double MAX_DRINK_DIST_SQ = 1.0D;
 
     public FindWaterBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -35,14 +34,15 @@ public class FindWaterBowlGoal extends Goal {
     public boolean canUse() {
         if (critter.level().isClientSide()) return false;
 
-        // solo si tiene sed
         if (!critter.isThirsty()) return false;
 
         bowlPos = findNearestWaterBowl();
         if (bowlPos != null) {
-            System.out.println("[WATER-BOWL-GOAL] canUse=TRUE pos=" + critter.blockPosition()
-                    + " thirst=" + critter.getThirst()
-                    + " bowl=" + bowlPos.toShortString());
+            if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                System.out.println("[WATER-BOWL-GOAL] canUse=TRUE pos=" + critter.blockPosition()
+                        + " thirst=" + critter.getThirst()
+                        + " bowl=" + bowlPos.toShortString());
+            }
             return true;
         }
         return false;
@@ -53,14 +53,9 @@ public class FindWaterBowlGoal extends Goal {
         if (critter.level().isClientSide()) return false;
         if (bowlPos == null) return false;
 
-        // si ya no tiene sed, termina
-        if (!critter.isThirsty()) return false;
-
-        // si ya no hay agua, termina
         boolean hasWater = BowlFeedingHelper.hasWaterFor((Level) critter.level(), bowlPos);
         if (!hasWater) return false;
 
-        // mientras no esté al máximo de sed, puede seguir
         return critter.getThirst() < critter.maxThirst();
     }
 
@@ -95,7 +90,6 @@ public class FindWaterBowlGoal extends Goal {
         Vec3 bowlCenter = Vec3.atCenterOf(bowlPos);
         double distSq = critter.distanceToSqr(bowlCenter);
 
-        // Si todavía está lejos, solo caminamos hacia el bowl
         if (distSq > MAX_DRINK_DIST_SQ) {
             critter.setIsDrinking(false);
             critter.setDrinkPos(null);
@@ -105,7 +99,6 @@ public class FindWaterBowlGoal extends Goal {
             return;
         }
 
-        // ------------ YA ESTÁ PEGADO AL BOWL ------------
 
         critter.setIsDrinking(true);
         critter.setDrinkPos(bowlPos);
@@ -123,24 +116,27 @@ public class FindWaterBowlGoal extends Goal {
 
         drinkTimer++;
         if (drinkTimer % DRINK_INTERVAL == 0) {
-            System.out.println("[WATER-BOWL-GOAL] Intentando beber en " + bowlPos +
-                    " thirst=" + critter.getThirst());
+            if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                System.out.println("[WATER-BOWL-GOAL] Intentando beber en " + bowlPos +
+                        " thirst=" + critter.getThirst());
+            }
 
             boolean drank = BowlFeedingHelper.consumeWaterFor(critter, (Level) critter.level(), bowlPos);
 
-            System.out.println("[WATER-BOWL-GOAL] DRANK=" + drank +
-                    " newThirst=" + critter.getThirst());
+            if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                System.out.println("[WATER-BOWL-GOAL] DRANK=" + drank +
+                        " newThirst=" + critter.getThirst());
+            }
 
             if (!drank || critter.getThirst() >= critter.maxThirst()) {
-                System.out.println("[WATER-BOWL-GOAL] Fin de bebida (sin agua o lleno).");
+                if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                    System.out.println("[WATER-BOWL-GOAL] Fin de bebida (sin agua o lleno).");
+                }
                 this.stop();
             }
         }
     }
 
-    /**
-     * Busca el bowl de agua más cercano dentro de un radio cúbico alrededor de la critter.
-     */
     @Nullable
     private BlockPos findNearestWaterBowl() {
         Level level = (Level) critter.level();
@@ -152,7 +148,7 @@ public class FindWaterBowlGoal extends Goal {
 
         int r = this.searchRadius;
         for (int dx = -r; dx <= r; dx++) {
-            for (int dy = -2; dy <= 2; dy++) { // no necesitamos buscar muy alto
+            for (int dy = -2; dy <= 2; dy++) {
                 for (int dz = -r; dz <= r; dz++) {
                     BlockPos pos = origin.offset(dx, dy, dz);
                     if (!BowlFeedingHelper.hasWaterFor(level, pos)) continue;

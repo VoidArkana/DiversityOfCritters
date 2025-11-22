@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.common.entity.ai;
 
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
@@ -20,23 +21,11 @@ public class CritterDrinkGoal extends Goal {
     private BlockPos targetPos;
     private int drinkTime = 0;
 
-    // ---- Probabilidad de intentar beber (sigue igual) ----
-    private static final float DRINK_CHANCE = 0.7F;
+    private static final float DRINK_CHANCE = 0.3F;
 
-    private int executionChance = 30; // por si luego lo quieres usar
-    private Direction[] HORIZONTALS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
-
-    // ==== NUEVOS PARÁMETROS DE BALANCE PARA AGUA NATURAL ====
-
-    // Cada cuántos ticks se toma un “sorbo” de agua natural
-    private static final int NATURAL_WATER_SIP_INTERVAL_TICKS = 20; // 1 segundo (20 ticks)
-
-    // Cuánto restaura cada sorbo de agua natural
-    private static final int NATURAL_WATER_RESTORE_PER_SIP = 50;    // 20 sorbos -> 1000 sed
-
-    // Tiempo máximo bebiendo seguido desde una misma posición (por seguridad)
-    private static final int MAX_DRINK_TIME_TICKS = 20 * 25; // 25 s de margen aprox
-
+    private final Direction[] HORIZONTALS = new Direction[]{
+            Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
+    };
 
     public CritterDrinkGoal(DiverseCritter creature) {
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -45,12 +34,14 @@ public class CritterDrinkGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        // Solo entra si NO está “sediento” según tu regla (solo top-up casual)
-        if (critter.isThirsty()) {
+        if (critter.level().isClientSide()) {
             return false;
         }
 
-        // Probabilidad del 70% de activar cuando pasa por aquí
+        if (critter.getThirst() >= critter.maxThirst()) {
+            return false;
+        }
+
         if (critter.getRandom().nextFloat() >= DRINK_CHANCE) {
             return false;
         }
@@ -78,15 +69,17 @@ public class CritterDrinkGoal extends Goal {
     public void tick() {
         if (targetPos != null && waterPos != null) {
             double dist = this.critter.distanceToSqr(Vec3.atCenterOf(waterPos));
+
             if (dist > 2 && this.critter.IsDrinking()) {
                 this.critter.setIsDrinking(false);
+                this.critter.setDrinkPos(null);
             }
 
-            if (dist <= 1F) {
-                // ---- Ya está junto al agua ----
+            if (dist <= 1.0F) {
                 double d0 = waterPos.getX() + 0.5D - this.critter.getX();
                 double d2 = waterPos.getZ() + 0.5D - this.critter.getZ();
-                float yaw = (float)(Mth.atan2(d2, d0) * (double) Mth.RAD_TO_DEG) - 90.0F;
+                float yaw = (float)(Mth.atan2(d2, d0) * (double)Mth.RAD_TO_DEG) - 90.0F;
+
                 this.critter.setYRot(yaw);
                 this.critter.yHeadRot = yaw;
                 this.critter.yBodyRot = yaw;
@@ -97,37 +90,38 @@ public class CritterDrinkGoal extends Goal {
 
                 drinkTime++;
 
-                // === NUEVO: un sorbo cada NATURAL_WATER_SIP_INTERVAL_TICKS ===
-                if (drinkTime % NATURAL_WATER_SIP_INTERVAL_TICKS == 0) {
-                    int prevThirst = critter.getThirst();
-                    int newThirst  = Math.min(prevThirst + NATURAL_WATER_RESTORE_PER_SIP, critter.maxThirst());
-                    this.critter.setThirst(newThirst);
+                if (drinkTime % 10 == 0) {
+                    CritterDietConfig diet = critter.getDietConfig();
+                    int restorePerSip = diet.thirstPerWaterBowl; // en tu civeta: 99
 
-                    // Evento + sonido sincronizados con el sorbo
+                    int prevThirst = critter.getThirst();
+                    this.critter.setThirst(
+                            Math.min(prevThirst + restorePerSip, critter.maxThirst())
+                    );
+
                     this.critter.gameEvent(GameEvent.BLOCK_ACTIVATE);
-                    this.critter.playSound(SoundEvents.GENERIC_SWIM, 0.7F,
-                            0.5F + critter.getRandom().nextFloat());
+                    this.critter.playSound(
+                            SoundEvents.GENERIC_SWIM,
+                            0.7F,
+                            0.5F + critter.getRandom().nextFloat()
+                    );
                 }
 
-                // mirada hacia el agua (sigues igual)
                 this.critter.getLookControl().setLookAt(
                         (double)this.waterPos.getX() + 0.5D,
-                        (double)(this.waterPos.getY()-1.5),
+                        (double)(this.waterPos.getY() - 1.5),
                         (double)this.waterPos.getZ() + 0.5D,
                         10.0F,
                         (float)this.critter.getMaxHeadXRot()
                 );
 
-                // cortar si se llenó o pasó demasiado tiempo
-                if (critter.getThirst() >= critter.maxThirst()
-                        || drinkTime > MAX_DRINK_TIME_TICKS) {
+                if (drinkTime > 100 || critter.getThirst() >= critter.maxThirst()) {
                     this.stop();
                 }
-
             } else {
-                // Todavía se está acercando al borde del agua
                 this.critter.getNavigation().moveTo(
-                        waterPos.getX(), waterPos.getY(), waterPos.getZ(), 1.2D);
+                        waterPos.getX(), waterPos.getY(), waterPos.getZ(), 1.2D
+                );
             }
         }
     }
@@ -140,20 +134,25 @@ public class CritterDrinkGoal extends Goal {
         return targetPos != null && !this.critter.isInWater();
     }
 
+    // --------- Búsqueda de agua natural ---------
+
     public BlockPos generateTarget() {
         BlockPos blockpos = null;
         final RandomSource random = this.critter.getRandom();
         int range = 32;
+
         for (int i = 0; i < 15; i++) {
             BlockPos blockpos1 = this.critter.blockPosition().offset(
                     random.nextInt(range) - range / 2,
                     3,
                     random.nextInt(range) - range / 2
             );
+
             while (this.critter.level().isEmptyBlock(blockpos1)
                     && blockpos1.getY() > critter.level().getMinBuildHeight()) {
                 blockpos1 = blockpos1.below();
             }
+
             if (isConnectedToLand(blockpos1)) {
                 blockpos = blockpos1;
             }

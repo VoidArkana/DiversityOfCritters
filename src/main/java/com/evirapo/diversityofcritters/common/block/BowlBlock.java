@@ -23,7 +23,6 @@ import javax.annotation.Nullable;
 
 public class BowlBlock extends Block implements EntityBlock {
 
-    // Propiedad que ya teníamos
     public static final EnumProperty<BowlContent> CONTENT =
             EnumProperty.create("content", BowlContent.class);
 
@@ -46,15 +45,11 @@ public class BowlBlock extends Block implements EntityBlock {
         return SHAPE;
     }
 
-    // ---- BlockEntity ----
-
     @Nullable
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new BowlBlockEntity(pos, state);
     }
-
-    // ---- Abrir GUI ----
 
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos,

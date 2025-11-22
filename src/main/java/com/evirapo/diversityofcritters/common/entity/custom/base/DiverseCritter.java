@@ -52,6 +52,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     int prevHunger;
     int prevThirst;
 
+    private double hungerLossAccum = 0.0;
+    private double thirstLossAccum = 0.0;
+
     protected DiverseCritter(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.createInventory();
@@ -64,10 +67,18 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public int maxHunger(){ return 100; }
     public int maxThirst(){ return 100; }
 
+
+    protected double getHungerLossPerSecond() {
+        return 10.0;
+    }
+
+    protected double getThirstLossPerSecond() {
+        return 20.0;
+    }
+
     // ---------- STATE HELPERS (WANDERING/FOLLOWING) ----------
     public boolean isWandering() { return this.entityData.get(WANDERING); }
     public void setWandering(boolean value) { this.entityData.set(WANDERING, value); }
-    /** Estado derivado: siguiendo al dueño cuando no está sentado ni en wandering */
     public boolean isFollowing() { return !this.isOrderedToSit() && !this.isWandering(); }
 
     // ---------- SYNC ----------
@@ -158,22 +169,40 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (sleepController == null) {
             sleepController = createSleepController();
         }
+
         if (!this.level().isClientSide()) {
+            // Ciclo de sueño
             sleepController.tick(this.tickCount);
-        }
 
-        if (this.getHunger() > 0 && this.tickCount % 2 == 0) {
-            this.prevHunger = this.getHunger();
-            this.setHunger(prevHunger - 1);
-        }
+            if (this.getHunger() > 0) {
+                double lossPerTick = getHungerLossPerSecond() / 20.0;
+                hungerLossAccum += lossPerTick;
 
-        if (this.getThirst() > 0) {
-            this.prevThirst = this.getThirst();
-            this.setThirst(prevThirst - 1);
-        }
+                if (hungerLossAccum >= 1.0) {
+                    int loss = (int) hungerLossAccum;
+                    hungerLossAccum -= loss;
 
-        if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){
-            this.starve();
+                    this.prevHunger = this.getHunger();
+                    this.setHunger(prevHunger - loss);
+                }
+            }
+
+            if (this.getThirst() > 0) {
+                double lossPerTick = getThirstLossPerSecond() / 20.0;
+                thirstLossAccum += lossPerTick;
+
+                if (thirstLossAccum >= 1.0) {
+                    int loss = (int) thirstLossAccum;
+                    thirstLossAccum -= loss;
+
+                    this.prevThirst = this.getThirst();
+                    this.setThirst(prevThirst - loss);
+                }
+            }
+
+            if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){
+                this.starve();
+            }
         }
 
         if (this.isOrderedToSit()) {
@@ -207,8 +236,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             return !DiverseCritter.this.isCrouching();
         }
     }
-
-
 
     public class CritterMoveControl extends MoveControl {
         public CritterMoveControl() { super(DiverseCritter.this); }
@@ -311,7 +338,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
-
     // ---------- SPAWN ----------
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty,
@@ -324,7 +350,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         return res;
     }
 
-    // ---------- SLEPP ----------
+    // ---------- SLEEP ----------
     @Override public boolean isSleeping() { return entityData.get(SLEEPING); }
     @Override public void setSleeping(boolean value) { entityData.set(SLEEPING, value); }
     @Override public boolean isPreparingSleep() { return entityData.get(PREPARING_SLEEP); }
@@ -363,7 +389,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 && !this.isOrderedToSit();
     }
 
-
     @Override
     public void aiStep() {
         if (isSleeping() || isPreparingSleep() || isAwakeing()) {
@@ -391,8 +416,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
         super.travel(travelVector);
     }
-
-
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
@@ -453,7 +476,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             return;
         }
 
-
         if (this.isInSittingPose() && !this.isWandering()) {
             if (!sitState.isStarted()) {
                 sitState.start(this.tickCount);
@@ -463,11 +485,15 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
-    //DIET
+    // DIET
+
+    public static final boolean DEBUG_BOWL_GOALS = false;
 
     public abstract CritterDietConfig getDietConfig();
 
     public void debugGoalMessage(String goalName, String state) {
+        if (!DEBUG_BOWL_GOALS) return;
+
         if (this.level().isClientSide()) return;
 
         String base = "[BOWL-GOAL][" + this.getName().getString() + "] " + goalName + " " + state;

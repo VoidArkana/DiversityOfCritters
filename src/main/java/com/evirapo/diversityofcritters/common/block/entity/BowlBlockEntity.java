@@ -21,7 +21,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider {
 
-    public static int WATER_CHARGES_PER_BOWL = 10;
+    public static final int WATER_CHARGES_PER_BUCKET = 10;
 
     private int waterCharges = 0;
 
@@ -68,7 +68,6 @@ public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.
         }
         ContainerHelper.saveAllItems(tag, items);
 
-        // Guardar cargas de agua
         tag.putInt("WaterCharges", this.waterCharges);
     }
 
@@ -83,7 +82,6 @@ public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.
             inventory.setItem(i, items.get(i));
         }
 
-        // Cargar cargas de agua
         this.waterCharges = tag.getInt("WaterCharges");
 
         updateContentState();
@@ -97,7 +95,6 @@ public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.
         }
     }
 
-    // ---- MenuProvider ----
 
     @Override
     public Component getDisplayName() {
@@ -118,6 +115,7 @@ public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.
         int meatCount  = 0;
         int vegCount   = 0;
         int waterCount = 0;
+        int waterUnits = 0;
 
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             ItemStack stack = inventory.getItem(i);
@@ -125,6 +123,7 @@ public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.
 
             if (BowlLogic.isWater(stack)) {
                 waterCount++;
+                waterUnits += stack.getCount();
             } else if (BowlLogic.isMeat(stack)) {
                 meatCount++;
             } else if (BowlLogic.isVegOrLeaves(stack)) {
@@ -136,29 +135,22 @@ public class BowlBlockEntity extends BlockEntity implements net.minecraft.world.
 
         if (meatCount > 0 && vegCount > 0) {
             newContent = BowlContent.MIX;
-
         } else if (waterCount > 0) {
             newContent = BowlContent.WATER;
-
         } else if (meatCount > 0) {
             newContent = BowlContent.MEAT;
-
         } else if (vegCount > 0) {
             newContent = BowlContent.VEG;
-
         } else {
             newContent = BowlContent.EMPTY;
         }
 
         BowlContent oldContent = state.getValue(BowlBlock.CONTENT);
 
-        // Gestionar cargas al cambiar el tipo de contenido
         if (oldContent != newContent) {
             if (newContent == BowlContent.WATER) {
-                // Cada vez que pasa a WATER, recargamos el bowl
-                this.waterCharges = WATER_CHARGES_PER_BOWL;
+                this.waterCharges = waterUnits * WATER_CHARGES_PER_BUCKET;
             } else {
-                // Si deja de ser WATER, reseteamos cargas
                 this.waterCharges = 0;
             }
             setChanged();

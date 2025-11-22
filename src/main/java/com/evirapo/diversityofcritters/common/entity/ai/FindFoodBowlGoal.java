@@ -17,12 +17,11 @@ public class FindFoodBowlGoal extends Goal {
     private final double speed;
     private final int searchRadius;
 
-    private BlockPos bowlPos;        // posición del bowl con comida
+    private BlockPos bowlPos;
     private int eatTimer = 0;
-    private static final int EAT_INTERVAL = 40; // 2 segundos aprox
+    private static final int EAT_INTERVAL = 40;
 
-    // radio real en bloques para considerarse “junto” al bowl
-    private static final double MAX_EAT_DIST_SQ = 1.0D; // distancia^2 (1 bloque)
+    private static final double MAX_EAT_DIST_SQ = 1.0D;
 
     public FindFoodBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -35,14 +34,15 @@ public class FindFoodBowlGoal extends Goal {
     public boolean canUse() {
         if (critter.level().isClientSide()) return false;
 
-        // Solo si tiene hambre
         if (!critter.isHungry()) return false;
 
         bowlPos = findNearestFoodBowl();
         if (bowlPos != null) {
-            System.out.println("[BOWL-GOAL] canUse=TRUE pos=" + critter.blockPosition()
-                    + " hunger=" + critter.getHunger()
-                    + " bowl=" + bowlPos.toShortString());
+            if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                System.out.println("[BOWL-GOAL] canUse=TRUE pos=" + critter.blockPosition()
+                        + " hunger=" + critter.getHunger()
+                        + " bowl=" + bowlPos.toShortString());
+            }
             return true;
         }
         return false;
@@ -53,22 +53,16 @@ public class FindFoodBowlGoal extends Goal {
         if (critter.level().isClientSide()) return false;
         if (bowlPos == null) return false;
 
-        // si ya no tiene hambre, termina
-        if (!critter.isHungry()) return false;
-
-        // si ya no hay comida compatible, termina
         boolean hasFood = BowlFeedingHelper.hasFoodFor(critter, (Level) critter.level(), bowlPos);
         if (!hasFood) return false;
 
-        // mientras no esté lleno, puede seguir
         return critter.getHunger() < critter.maxHunger();
     }
 
     @Override
     public void start() {
         eatTimer = 0;
-        critter.setIsDrinking(false); // reutilizas este flag para “bloquear” movimiento
-        // (si quieres, podrías crear un flag IS_EATING separado en el futuro)
+        critter.setIsDrinking(false);
 
         if (bowlPos != null) {
             Vec3 center = Vec3.atCenterOf(bowlPos);
@@ -94,7 +88,6 @@ public class FindFoodBowlGoal extends Goal {
         Vec3 bowlCenter = Vec3.atCenterOf(bowlPos);
         double distSq = critter.distanceToSqr(bowlCenter);
 
-        // Si todavía está lejos, solo caminamos hacia el bowl
         if (distSq > MAX_EAT_DIST_SQ) {
             critter.setIsDrinking(false);
 
@@ -104,15 +97,12 @@ public class FindFoodBowlGoal extends Goal {
             return;
         }
 
-        // ---------- YA ESTÁ PEGADO AL BOWL ----------
-
         critter.setIsDrinking(true);
 
         critter.getNavigation().stop();
         Vec3 dm = critter.getDeltaMovement();
         critter.setDeltaMovement(0, dm.y, 0);
 
-        // mirar hacia el bowl
         critter.getLookControl().setLookAt(
                 bowlCenter.x,
                 bowlCenter.y + 0.1D,
@@ -121,29 +111,32 @@ public class FindFoodBowlGoal extends Goal {
 
         eatTimer++;
         if (eatTimer % EAT_INTERVAL == 0) {
-            System.out.println("[BOWL-GOAL] Intentando comer en " + bowlPos +
-                    " hunger=" + critter.getHunger());
+            if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                System.out.println("[BOWL-GOAL] Intentando comer en " + bowlPos +
+                        " hunger=" + critter.getHunger());
+            }
 
             boolean ate = BowlFeedingHelper.consumeFoodFor(critter, (Level) critter.level(), bowlPos);
 
-            System.out.println("[BOWL-GOAL] ATE=" + ate +
-                    " newHunger=" + critter.getHunger());
+            if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                System.out.println("[BOWL-GOAL] ATE=" + ate +
+                        " newHunger=" + critter.getHunger());
+            }
 
             if (!ate || critter.getHunger() >= critter.maxHunger()) {
-                System.out.println("[BOWL-GOAL] Fin de comida (sin comida o lleno).");
+                if (DiverseCritter.DEBUG_BOWL_GOALS) {
+                    System.out.println("[BOWL-GOAL] Fin de comida (sin comida o lleno).");
+                }
                 this.stop();
             }
         }
     }
 
-    /**
-     * Busca el bowl con comida compatible más cercano dentro de un radio cúbico.
-     */
     @Nullable
     private BlockPos findNearestFoodBowl() {
         Level level = (Level) critter.level();
         BlockPos origin = critter.blockPosition();
-        RandomSource random = critter.getRandom(); // por si luego quieres aleatorizar algo
+        RandomSource random = critter.getRandom();
 
         BlockPos bestPos = null;
         double bestDistSq = Double.MAX_VALUE;

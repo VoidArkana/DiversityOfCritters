@@ -18,7 +18,7 @@ public class DOCBlocks {
             () -> new BowlBlock(
                     BlockBehaviour.Properties
                             .copy(Blocks.OAK_PLANKS)
-                            .noOcclusion()   // importante para modelos “huecos”
+                            .noOcclusion()
             )
     );
 

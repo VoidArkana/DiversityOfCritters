@@ -322,9 +322,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
         if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS)) {
 
-            // --- NUEVO: carne del suelo = 25% más que el bowl de carne ---
-            int baseBowl = this.getDietConfig().hungerPerMeatBowl; // 32 en tu config
-            int restore  = baseBowl + baseBowl / 4;                 // +25% -> 40
+            int baseBowl = this.getDietConfig().hungerPerMeatBowl;
+            int restore  = baseBowl + baseBowl / 4;
 
             int before = this.getHunger();
             this.setHunger(Math.min(before + restore, this.maxHunger()));
@@ -749,11 +748,12 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                 true,
                 true,
                 true,
-                32,
-                10,
-                30,
-                33
+                200,      // hungerPerMeatBowl
+                10,      // hungerPerVegBowl
+                30,      // hungerPerMixBowl
+                300   // thirstPerWaterBowl
         );
     }
+
 
 }
