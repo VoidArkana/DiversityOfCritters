@@ -749,8 +749,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                 true,
                 true,
                 200,      // hungerPerMeatBowl
-                10,      // hungerPerVegBowl
-                30,      // hungerPerMixBowl
+                200,      // hungerPerVegBowl
+                200,      // hungerPerMixBowl
                 300   // thirstPerWaterBowl
         );
     }

@@ -22,7 +22,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class BowlBlockEntity extends BlockEntity implements MenuProvider {
 
-    public static final int WATER_CHARGES_PER_BUCKET = 10;
+    public static final int WATER_CHARGES_PER_BOTTLE = 10;
 
     private int waterCharges = 0;
 
@@ -96,6 +96,7 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
         }
     }
 
+    // ---- MenuProvider ----
 
     @Override
     public Component getDisplayName() {
@@ -150,7 +151,7 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
 
         if (oldContent != newContent) {
             if (newContent == BowlContent.WATER) {
-                this.waterCharges = waterUnits * WATER_CHARGES_PER_BUCKET;
+                this.waterCharges = waterUnits * WATER_CHARGES_PER_BOTTLE;
             } else {
                 this.waterCharges = 0;
             }
@@ -171,7 +172,9 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
                     || stack.is(net.minecraft.world.item.Items.MUTTON)
                     || stack.is(net.minecraft.world.item.Items.RABBIT)
                     || stack.is(net.minecraft.world.item.Items.SALMON)
-                    || stack.is(net.minecraft.world.item.Items.COD);
+                    || stack.is(net.minecraft.world.item.Items.COD)
+                    || stack.is(net.minecraft.world.item.Items.EGG)
+                    || stack.is(net.minecraft.world.level.block.Blocks.TURTLE_EGG.asItem());
         }
 
         public static boolean isVegOrLeaves(ItemStack stack) {
@@ -193,15 +196,10 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
         }
 
         public static boolean isWater(ItemStack stack) {
-            if (stack.is(net.minecraft.world.item.Items.WATER_BUCKET)) {
-                return true;
-            }
-
             if (stack.is(net.minecraft.world.item.Items.POTION)) {
                 return net.minecraft.world.item.alchemy.PotionUtils.getPotion(stack)
                         == net.minecraft.world.item.alchemy.Potions.WATER;
             }
-
             return false;
         }
     }
