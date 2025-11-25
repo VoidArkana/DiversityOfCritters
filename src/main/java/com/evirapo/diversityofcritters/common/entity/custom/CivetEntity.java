@@ -613,6 +613,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
 
     @Override public int maxHunger() { return 4000; }
     @Override public int maxThirst() { return 4000; }
+    @Override public int maxEnrichment() { return 4000; }
 
     @Override public boolean isAttacking() { return this.entityData.get(IS_ATTACKING); }
     @Override public void setAttacking(boolean v) { this.entityData.set(IS_ATTACKING, v); }

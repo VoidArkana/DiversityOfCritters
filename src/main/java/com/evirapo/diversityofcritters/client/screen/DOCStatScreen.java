@@ -45,7 +45,8 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
 
         int k = (this.width - this.imageWidth) / 2;
         int l = (this.height - this.imageHeight) / 2;
-        int buttonsY = l + 96;
+
+        int buttonsY = l + 107;
 
         this.sunBtn = new ImageButton(
                 k + 13, buttonsY, 16, 16,
@@ -85,11 +86,7 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         }
     }
 
-    @Override
-    protected boolean isHovering(int x, int y, int width, int height, double mouseX, double mouseY) {
-        return false;
-    }
-
+    // ... (Mantén los métodos de mouseClicked, mouseReleased, mouseDragged, etc. iguales) ...
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         boolean handled = false;
@@ -130,9 +127,7 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        return true;
-    }
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) { return true; }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -158,7 +153,6 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         if (this.minecraft == null || this.minecraft.player == null) return false;
         return this.entity.isTame() && this.entity.isOwnedBy(this.minecraft.player);
     }
-
 
     private void setDiurnalButtonsEnabled(boolean enabled) {
         if (this.sunBtn != null) {
@@ -192,12 +186,27 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
 
         float hungerPercent = ((float) entity.getHungerPercentage() / 100);
         float thirstPercent = ((float) entity.getThirstPercentage() / 100);
+        // NUEVO: Porcentaje de Enrichment
+        float enrichmentPercent = ((float) entity.getEnrichmentPercentage() / 100);
+
         int hungerWidth = (int) (102 * hungerPercent);
         int thirstWidth = (int) (102 * thirstPercent);
+        // NUEVO: Ancho de barra
+        int enrichmentWidth = (int) (102 * enrichmentPercent);
 
         graphics.blit(BOOK_LOCATION, k, l, 0, 0, 128, 128, 128, 128);
+
+        // Barra Hambre (Y = 61)
         graphics.blit(BARS_LOCATION, k + 13, l + 61, 13, 61, hungerWidth, 13, 128, 128);
+
+        // Barra Sed (Y = 77)
         graphics.blit(BARS_LOCATION, k + 13, l + 77, 13, 77, thirstWidth, 13, 128, 128);
+
+        // NUEVO: Barra Enrichment (Y = 93)
+        // 93 sale de sumar 16 píxeles a la posición de Sed (77 + 16 = 93)
+        // El 4to argumento (13) es la X en la textura
+        // El 5to argumento (93) es la Y en la textura bars_gui.png donde empieza la barra verde
+        graphics.blit(BARS_LOCATION, k + 13, l + 93, 13, 93, enrichmentWidth, 13, 128, 128);
 
         InventoryScreen.renderEntityInInventoryFollowsMouse(graphics, k + 30, l + 40, 50, -mouseX + k + 35, -mouseY + l + 30, entity);
     }
@@ -214,6 +223,8 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         pose.pushPose();
         pose.scale(0.5f, 0.5f, 0.5f);
         pose.translate(35, 40, 0);
+
+        // ... (Labels existentes: Nombre, Salud, Especie, Sexo, Edad, Modo) ...
 
         Component name = Component.translatable("screen.diversityofcritters.name");
         String creatureName = name.getString() + ": " + (entity.getCustomName() == null ? none.getString() : entity.getCustomName().getString());
@@ -241,13 +252,22 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         String mode = entity.isDiurnal() ? "Mode: Diurnal" : "Mode: Nocturnal";
         graphics.drawString(this.font, mode, this.imageWidth / 2 - this.font.width(mode) / 2 + 38 + xOffset, 19 + (11 * 3), 0X667819, false);
 
+        // Hunger Label
         Component hungerKey = Component.translatable("screen.diversityofcritters.hunger");
         String hunger = hungerKey.getString();
         graphics.drawString(this.font, hunger, this.imageWidth / 2 - this.font.width(hunger) / 2 + xOffset - 5, 90, 0XFFFFFF, true);
 
+        // Thirst Label (Pos 122)
         Component thirstKey = Component.translatable("screen.diversityofcritters.thirst");
         String thirst = thirstKey.getString();
         graphics.drawString(this.font, thirst, this.imageWidth / 2 - this.font.width(thirst) / 2 + xOffset - 5, 122, 0XFFFFFF, true);
+
+        // NUEVO: Enrichment Label (Pos 154)
+        // 154 sale de sumar 32 a la posición de Sed (122 + 32 = 154) debido a la escala de texto 0.5x
+        Component enrichmentKey = Component.translatable("screen.diversityofcritters.enrichment");
+        // Asegúrate de añadir "screen.diversityofcritters.enrichment": "Enrichment" en tu archivo en_us.json
+        String enrichment = enrichmentKey.getString();
+        graphics.drawString(this.font, enrichment, this.imageWidth / 2 - this.font.width(enrichment) / 2 + xOffset - 5, 154, 0XFFFFFF, true);
 
         pose.popPose();
     }

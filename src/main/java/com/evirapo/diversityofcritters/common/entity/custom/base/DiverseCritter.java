@@ -16,6 +16,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.*;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
@@ -40,6 +41,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Integer> HUNGER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> THIRST = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> ENRICHMENT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DRINKING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Optional<BlockPos>> DRINK_POS = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
 
@@ -51,9 +53,11 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     int prevHunger;
     int prevThirst;
+    int prevEnrichment;
 
     private double hungerLossAccum = 0.0;
     private double thirstLossAccum = 0.0;
+    private double enrichmentLossAccum = 0.0;
 
     protected DiverseCritter(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
@@ -66,13 +70,17 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     public int maxHunger(){ return 100; }
     public int maxThirst(){ return 100; }
-
+    public int maxEnrichment(){ return 100; }
 
     protected double getHungerLossPerSecond() {
         return 10.0;
     }
 
     protected double getThirstLossPerSecond() {
+        return 20.0;
+    }
+
+    protected double getEnrichmentLossPerSecond() {
         return 20.0;
     }
 
@@ -88,6 +96,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(IS_MALE, true);
         this.entityData.define(HUNGER, maxHunger());
         this.entityData.define(THIRST, maxThirst());
+        this.entityData.define(ENRICHMENT, maxEnrichment());
         this.entityData.define(DRINKING, false);
         this.entityData.define(DRINK_POS, Optional.empty());
         this.entityData.define(DATA_FLAGS_ID, (byte)0);
@@ -107,6 +116,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         pCompound.putBoolean("IsMale", this.getIsMale());
         pCompound.putInt("Hunger", this.getHunger());
         pCompound.putInt("Thirst", this.getThirst());
+        pCompound.putInt("Enrichment", this.getEnrichment());
         pCompound.putBoolean("Sleeping", isSleeping());
         pCompound.putBoolean("PreparingSleep", isPreparingSleep());
         pCompound.putBoolean("Awakening", isAwakeing());
@@ -120,6 +130,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.setIsMale(pCompound.getBoolean("IsMale"));
         this.setHunger(pCompound.getInt("Hunger"));
         this.setThirst(pCompound.getInt("Thirst"));
+        this.setEnrichment(pCompound.getInt("Enrichment"));
         setSleeping(pCompound.getBoolean("Sleeping"));
         setPreparingSleep(pCompound.getBoolean("PreparingSleep"));
         setAwakeing(pCompound.getBoolean("Awakening"));
@@ -134,6 +145,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     public int getHungerPercentage() { return (100 * this.getHunger())/this.maxHunger(); }
     public int getThirstPercentage() { return (100 * this.getThirst())/this.maxThirst(); }
+    public int getEnrichmentPercentage() {return (100 * this.getEnrichment()) / this.maxEnrichment();}
 
     public int getHunger() { return this.entityData.get(HUNGER); }
     public void setHunger(int hunger) {
@@ -146,6 +158,13 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public void setThirst(int thirst) {
         int clamped = Math.max(0, Math.min(maxThirst(), thirst));
         this.entityData.set(THIRST, clamped);
+    }
+
+    public int getEnrichment() {return this.entityData.get(ENRICHMENT);}
+
+    public void setEnrichment(int enrichment) {
+        int clamped = Math.max(0, Math.min(maxEnrichment(), enrichment));
+        this.entityData.set(ENRICHMENT, clamped );
     }
 
     public Boolean IsDrinking() { return this.entityData.get(DRINKING); }
@@ -171,7 +190,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
 
         if (!this.level().isClientSide()) {
-            // Ciclo de sueño
             sleepController.tick(this.tickCount);
 
             if (this.getHunger() > 0) {
@@ -197,6 +215,18 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
                     this.prevThirst = this.getThirst();
                     this.setThirst(prevThirst - loss);
+                }
+            }
+
+            if (this.getEnrichment() > 0) {
+                double lossPerTick = getEnrichmentLossPerSecond() / 20.0;
+                enrichmentLossAccum += lossPerTick;
+
+                if (enrichmentLossAccum >= 1.0) {
+                    int loss = (int) enrichmentLossAccum;
+                    enrichmentLossAccum -= loss;
+
+                    this.setEnrichment(this.getEnrichment() - loss);
                 }
             }
 
