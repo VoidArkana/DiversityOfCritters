@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters;
 
 import com.evirapo.diversityofcritters.client.menu.DOCMenuTypes;
 import com.evirapo.diversityofcritters.client.screen.BowlScreen;
+import com.evirapo.diversityofcritters.client.screen.DigBoxScreen;
 import com.evirapo.diversityofcritters.common.block.DOCBlockEntities;
 import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
@@ -47,7 +48,6 @@ public class DiversityOfCritters {
 
         MinecraftForge.EVENT_BUS.register(this);
 
-        //modEventBus.addListener(this::addCreative);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -60,6 +60,7 @@ public class DiversityOfCritters {
     private void clientSetup(final FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             MenuScreens.register(DOCMenuTypes.BOWL.get(), BowlScreen::new);
+            MenuScreens.register(DOCMenuTypes.DIG_BOX_MENU.get(), DigBoxScreen::new);
         });
     }
 

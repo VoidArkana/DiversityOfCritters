@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.client.menu;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.block.BowlMenu;
+import com.evirapo.diversityofcritters.common.block.DigBoxMenu;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraftforge.common.extensions.IForgeMenuType;
@@ -19,6 +20,9 @@ public class DOCMenuTypes {
             MENUS.register("bowl",
                     () -> IForgeMenuType.create(BowlMenu::new)
             );
+
+    public static final RegistryObject<MenuType<DigBoxMenu>> DIG_BOX_MENU =
+            MENUS.register("dig_box_menu", () -> IForgeMenuType.create(DigBoxMenu::new));
 
     public static void register(IEventBus eventBus) {
         MENUS.register(eventBus);

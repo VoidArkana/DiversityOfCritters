@@ -33,6 +33,9 @@ public class DOCItems {
     public static final RegistryObject<Item> BOWL = ITEM_TYPES.register("bowl",
             () -> new BlockItem(DOCBlocks.BOWL.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> DIG_BOX = ITEM_TYPES.register("dig_box",
+            () -> new BlockItem(DOCBlocks.DIG_BOX.get(), new Item.Properties()));
+
     public static void register(IEventBus eventBus) {
         ITEM_TYPES.register(eventBus);
     }

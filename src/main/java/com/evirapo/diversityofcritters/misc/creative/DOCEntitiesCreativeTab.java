@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.misc.creative;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -34,6 +35,7 @@ public class DOCEntitiesCreativeTab {
                         output.accept(DOCItems.ZOO_BOOK.get());
                         output.accept(DOCItems.TRAINING_STICK.get());
                         output.accept(DOCItems.BOWL.get());
+                        output.accept(DOCItems.DIG_BOX.get());
 
                     })
                     .build());

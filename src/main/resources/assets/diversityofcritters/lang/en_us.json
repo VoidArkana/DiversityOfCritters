@@ -29,5 +29,6 @@
   "screen.diversityofcritters.is_baby.false": "Adult",
 
   "screen.diversityofcritters.species": "Species",
-  "container.diversityofcritters.bowl": "Bowl"
+  "container.diversityofcritters.bowl": "Bowl",
+  "block.diversityofcritters.dig_box": "Dig Box"
 }

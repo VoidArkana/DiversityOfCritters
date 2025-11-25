@@ -22,6 +22,9 @@ public class DOCBlocks {
             )
     );
 
+    public static final RegistryObject<Block> DIG_BOX = BLOCKS.register("dig_box",
+            () -> new DigBoxBlock(BlockBehaviour.Properties.copy(Blocks.OAK_PLANKS).noOcclusion()));
+
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);
     }
