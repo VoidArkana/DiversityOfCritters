@@ -154,6 +154,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
 		this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
 		this.animate(entity.sitState,   CivetAnims.SIT, ageInTicks, 1.0F);
+		this.animate(entity.diggingAnimationState,   CivetAnims.DIGGING, ageInTicks, 1.0F);
 
 		if (this.young){
 			this.applyStatic(CivetAnims.BABY);

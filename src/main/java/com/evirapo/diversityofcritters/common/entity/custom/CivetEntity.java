@@ -68,6 +68,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     public final AnimationState climbingUpState    = new AnimationState();
     public final AnimationState attackAnimationState = new AnimationState();
     public final AnimationState drinkingAnimationState = new AnimationState();
+    public final AnimationState diggingAnimationState = new AnimationState();
 
     private enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
 
@@ -104,6 +105,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     private static final EntityDataAccessor<Boolean> IS_ATTACKING =
             SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_CLIMBING  =
+            SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> IS_DIGGING =
             SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> TICKS_CLIMBING =
             SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
@@ -185,6 +188,24 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                         && super.canUse();
             }
             @Override public boolean canContinueToUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canContinueToUse();
+            }
+        });
+
+        this.goalSelector.addGoal(3, new FindDigBoxGoal(this, 1.1D, 16) {
+            @Override
+            public boolean canUse() {
+                return !isOrderedToSit()
+                        && !isSleeping() && !isPreparingSleep() && !isAwakeing()
+                        && !isIdleLocked()
+                        && super.canUse();
+            }
+
+            @Override
+            public boolean canContinueToUse() {
                 return !isOrderedToSit()
                         && !isSleeping() && !isPreparingSleep() && !isAwakeing()
                         && !isIdleLocked()
@@ -302,6 +323,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         super.defineSynchedData();
         this.entityData.define(IS_ATTACKING, false);
         this.entityData.define(IS_CLIMBING, false);
+        this.entityData.define(IS_DIGGING, false);
         this.entityData.define(TICKS_CLIMBING, 0);
         this.entityData.define(IDLE_VARIANT, toByte(IdleVariant.NONE));
         this.entityData.define(IDLE_LOCK_UNTIL, -1);
@@ -548,7 +570,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         boolean softIdle = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
                 && !doingAttack && !drinking && !hasTarget
-                && getIdleVariant() == IdleVariant.NONE;
+                && !this.isDigging() && getIdleVariant() == IdleVariant.NONE;
 
         this.idleAnimationState.animateWhen(softIdle, this.tickCount);
 
@@ -561,6 +583,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
 
         this.climbingUpState.animateWhen(this.isClimbingUp(), this.tickCount);
         this.drinkingAnimationState.animateWhen(this.isAlive() && this.IsDrinking(), this.tickCount);
+        this.diggingAnimationState.animateWhen(this.isDigging(), this.tickCount);
 
         if (this.isAttacking() && attackAnimationTimeout <= 0) {
             attackAnimationTimeout = 10;
@@ -624,6 +647,9 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     public boolean isClimbingUp() { return this.isClimbing() && this.getDeltaMovement().y>0.1f; }
     public void setClimbing(boolean v) { this.entityData.set(IS_CLIMBING, v); }
     public boolean onClimbable() { return isClimbing(); }
+
+    public boolean isDigging() {return this.entityData.get(IS_DIGGING);}
+    public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}
 
     @Override public int  attackAnimationTimeout() { return this.attackAnimationTimeout; }
     @Override public void setAttackAnimationTimeout(int v) { this.attackAnimationTimeout = v; }
@@ -749,10 +775,10 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
                 true,
                 true,
                 true,
-                200,      // hungerPerMeatBowl
-                200,      // hungerPerVegBowl
-                200,      // hungerPerMixBowl
-                300   // thirstPerWaterBowl
+                200,
+                200,
+                200,
+                300
         );
     }
 

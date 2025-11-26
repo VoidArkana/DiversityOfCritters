@@ -81,7 +81,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     }
 
     protected double getEnrichmentLossPerSecond() {
-        return 20.0;
+        return 10.0;
     }
 
     // ---------- STATE HELPERS (WANDERING/FOLLOWING) ----------
@@ -277,6 +277,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     }
     public boolean isHungry() {
         return getHunger() <= (int)(maxHunger() * 0.5f);
+    }
+    public boolean isEnrichmentNeeded() {
+        return getEnrichment() <= (int)(maxEnrichment() * 0.5f);
     }
 
     private boolean inventoryOpen;
@@ -517,7 +520,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     // DIET
 
-    public static final boolean DEBUG_BOWL_GOALS = false;
+    public static final boolean DEBUG_BOWL_GOALS = true;
 
     public abstract CritterDietConfig getDietConfig();
 
