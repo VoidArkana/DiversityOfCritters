@@ -3,8 +3,8 @@ package com.evirapo.diversityofcritters.common.entity.custom;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
-import com.evirapo.diversityofcritters.common.entity.custom.base.IAnimatedAttacker;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -31,6 +31,7 @@ import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.entity.animal.Chicken;
+import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
@@ -54,7 +55,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
-public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
+public class CivetEntity extends DiverseCritter {
 
     // --- ANIMATION STATES ---
     public final AnimationState idleAnimationState = new AnimationState();
@@ -76,14 +77,13 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Integer> IDLE_LOCK_UNTIL = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
 
-    private static final EntityDataAccessor<Boolean> IS_ATTACKING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_CLIMBING  = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_DIGGING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> TICKS_CLIMBING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
 
     // --- VARIABLES ---
     private int idleVariantCooldown = 0;
-    public int attackAnimationTimeout;
+    // attackAnimationTimeout movido a DiverseCritter
     public boolean isClimbableX;
     public boolean isClimbableZ;
     private LookForFoodItems forFoodGoal;
@@ -99,7 +99,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        this.entityData.define(IS_ATTACKING, false);
+        // IS_ATTACKING movido a DiverseCritter
         this.entityData.define(IS_CLIMBING, false);
         this.entityData.define(IS_DIGGING, false);
         this.entityData.define(TICKS_CLIMBING, 0);
@@ -123,50 +123,41 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     protected void registerGoals() {
         super.registerGoals();
 
-        // 0: Float (Siempre activo si está en agua)
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
-
-        // 1: Critical States (Sleep)
         this.goalSelector.addGoal(1, new SleepBehaviorGoal(this));
-
-        // 2: Orders
         this.goalSelector.addGoal(2, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(3, new BreedGoal(this, 1.0D));
 
-        // 3: High Priority Actions (Cleaning, Following Owner)
-        this.goalSelector.addGoal(3, new CivetCleanGoal(this));
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF), false));
 
-        this.goalSelector.addGoal(3, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
+        this.goalSelector.addGoal(5, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
             @Override public boolean canUse() { return isFollowing() && super.canUse(); }
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        // 4-9: Needs & Behavior (Checks de sueño eliminados, SleepBehaviorGoal tiene prioridad)
-        this.goalSelector.addGoal(4, new FindWaterBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(5, new CritterDrinkGoal(this));
-        this.goalSelector.addGoal(6, new BreedGoal(this, 1.0D));
-        this.goalSelector.addGoal(7, new FindDigBoxGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(8, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
-        this.goalSelector.addGoal(9, new FindFoodBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(6, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
 
+        this.goalSelector.addGoal(7, new CivetCleanGoal(this));
         this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS);
-        this.goalSelector.addGoal(3, this.forFoodGoal); // Alta prioridad para comida en suelo
+        this.goalSelector.addGoal(8, this.forFoodGoal);
 
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF, Items.COOKED_BEEF), false));
-        this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.15D));
+        this.goalSelector.addGoal(9, new FindFoodBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(10, new FindWaterBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(11, new CritterDrinkGoal(this));
+        this.goalSelector.addGoal(12, new FindDigBoxGoal(this, 1.1D, 16));
 
-        this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
+        this.goalSelector.addGoal(13, new FollowParentGoal(this, 1.15D));
+        this.goalSelector.addGoal(14, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
-                // Solo check extra: si está domesticado, solo pasea si está en modo "Wandering"
                 boolean canWander = !isTame() || isWandering();
                 return canWander && super.canUse();
             }
         });
+        this.goalSelector.addGoal(15, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(16, new RandomLookAroundGoal(this));
 
-        this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
-        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
-
-        this.targetSelector.addGoal(7, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
-        this.targetSelector.addGoal(7, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
     }
 
     // --- IDLE VARIANTS LOGIC ---
@@ -190,7 +181,6 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
 
     private void serverHandleIdleVariant() {
-        // Condiciones básicas para iniciar un Idle Variant
         boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
         boolean swimming     = this.isInWaterOrBubble();
         boolean climbing     = this.isClimbing();
@@ -207,11 +197,10 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
         boolean idleBase = this.isAlive()
                 && !sleepingLike && !moving && !swimming && !climbing
                 && !doingAttack && !drinking && !hasTarget && onGround
-                && !this.isCleaning(); // Importante: No iniciar variants si se está limpiando
+                && !this.isCleaning();
 
         IdleVariant current = getIdleVariant();
 
-        // 1. Resetear si acabó el tiempo
         if (current != IdleVariant.NONE && getIdleLockUntil() > 0 && this.tickCount >= getIdleLockUntil()) {
             setIdleVariant(IdleVariant.NONE);
             setIdleLockUntil(-1);
@@ -220,7 +209,6 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
         if (idleVariantCooldown > 0) idleVariantCooldown--;
 
-        // 2. Interrumpir si las condiciones cambian (ej. atacado, empujado)
         if (!idleBase && current != IdleVariant.NONE) {
             setIdleVariant(IdleVariant.NONE);
             setIdleLockUntil(-1);
@@ -228,14 +216,12 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
             return;
         }
 
-        // 3. Iniciar nuevo random variant
         if (idleBase && current == IdleVariant.NONE && idleVariantCooldown == 0) {
             if (this.random.nextFloat() < 0.01f) {
                 startServerIdleVariant(pickVariant());
             }
         }
 
-        // Stop movement if locked
         if (getIdleVariant() != IdleVariant.NONE) {
             this.getNavigation().stop();
             this.setTarget(null);
@@ -301,7 +287,6 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
     @Override
     public void aiStep() {
-        // Eating Item Logic
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
         if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS)) {
             int baseBowl = this.getDietConfig().hungerPerMeatBowl;
@@ -321,7 +306,6 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
         super.aiStep();
 
-        // Climbing Tick Logic
         Vec3 vec3 = this.getDeltaMovement();
         if (this.isClimbing() && (Math.abs(vec3.y) > 0.1D)) {
             if (!this.level().isClientSide && this.getTicksClimbing() < 3) {
@@ -418,6 +402,21 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
     // --- CLIENT VISUALS ---
     private void setupAnimationStatesClient() {
+        if (this.isOrderedToSit()) {
+            this.idleAnimationState.stop();
+            this.idleStandUpState.stop();
+            this.idleSniffLeftState.stop();
+            this.idleSniffRightState.stop();
+            this.idleSitState.stop();
+            this.idleLayState.stop();
+            this.cleanAnimationState.stop();
+            this.diggingAnimationState.stop();
+            this.climbingUpState.stop();
+            this.attackAnimationState.stop();
+            this.drinkingAnimationState.stop();
+            return;
+        }
+
         boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
         boolean swimming     = this.isInWaterOrBubble();
         boolean climbing     = this.isClimbing();
@@ -445,8 +444,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
         this.drinkingAnimationState.animateWhen(this.isAlive() && this.IsDrinking(), this.tickCount);
         this.diggingAnimationState.animateWhen(this.isDigging(), this.tickCount);
 
-        if (this.isAttacking() && attackAnimationTimeout <= 0) {
-            attackAnimationTimeout = 10;
+        if (this.isAttacking() && this.attackAnimationTimeout <= 0) {
+            this.attackAnimationTimeout = 10;
             attackAnimationState.start(this.tickCount);
         } else {
             --this.attackAnimationTimeout;
@@ -468,17 +467,16 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     @Override
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
         ItemStack itemstack = pPlayer.getItemInHand(pHand);
-        boolean isItemTamingMeat = itemstack.is(DoCTags.Items.MEATS) || itemstack.is(ItemTags.FISHES);
 
+        // 1. DOMESTICACIÓN
+        boolean isItemTamingMeat = itemstack.is(DoCTags.Items.MEATS) || itemstack.is(ItemTags.FISHES);
         if (isItemTamingMeat && !this.isTame()) {
             if (this.level().isClientSide()) {
                 return InteractionResult.CONSUME;
             } else {
                 if (!pPlayer.getAbilities().instabuild) itemstack.shrink(1);
-
                 if (this.tamingFeedsLeft <= 0) this.tamingFeedsLeft = 3 + this.random.nextInt(3);
                 this.tamingFeedsLeft--;
-
                 if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
                     this.tame(pPlayer);
                     this.navigation.recomputePath();
@@ -494,6 +492,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
             }
         }
 
+        // 2. CURACIÓN
         if (this.isTame()) {
             if (this.isFood(itemstack) && this.getHealth() < this.getMaxHealth()) {
                 var foodProps = itemstack.isEdible() ? itemstack.getFoodProperties(this) : null;
@@ -504,6 +503,41 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
                 return InteractionResult.SUCCESS;
             }
         }
+
+        // 3. TRAINING STICK
+        if (this.isOwnedBy(pPlayer) && itemstack.is(DOCItems.TRAINING_STICK.get())) {
+            if (level().isClientSide) return InteractionResult.CONSUME;
+
+            if (!this.isOrderedToSit() && !this.isWandering()) {
+                this.setWandering(true);
+                this.setOrderedToSit(false);
+                this.setInSittingPose(false);
+                this.messageState("wandering", pPlayer);
+            }
+            else {
+                boolean willSit = !this.isOrderedToSit();
+
+                if (willSit) {
+                    setIdleVariant(IdleVariant.NONE);
+                    setIdleLockUntil(-1);
+                    this.setCleaning(false);
+                    this.setAttacking(false);
+                    this.getNavigation().stop();
+                    this.setTarget(null);
+
+                    setModeSit(true);
+
+                    this.level().playSound(null, this.blockPosition(), SoundEvents.WOOL_PLACE, SoundSource.NEUTRAL, 0.6f, 1.0f);
+                } else {
+                    this.setWandering(false);
+                    this.setOrderedToSit(false);
+                    this.setInSittingPose(false);
+                }
+                this.messageState(willSit ? "sit" : "following", pPlayer);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide);
+        }
+
         return super.mobInteract(pPlayer, pHand);
     }
 
@@ -528,7 +562,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
     @Override
     public boolean isFood(ItemStack pStack) {
-        return pStack.is(Items.BEEF) || pStack.is(Items.COOKED_BEEF);
+        return pStack.is(Items.SWEET_BERRIES);
     }
 
     // --- HELPERS & CONFIG ---
@@ -542,10 +576,6 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     @Override public int getAwakeningDuration() {return 24;}
     @Override protected boolean getDefaultDiurnal() { return true; }
 
-    // Flags & Getters
-    @Override public boolean isAttacking() { return this.entityData.get(IS_ATTACKING); }
-    @Override public void setAttacking(boolean v) { this.entityData.set(IS_ATTACKING, v); }
-
     public boolean isClimbing() { return this.entityData.get(IS_CLIMBING); }
     public int getTicksClimbing() { return this.entityData.get(TICKS_CLIMBING); }
     public void setTicksClimbing(int v) { this.entityData.set(TICKS_CLIMBING, v); }
@@ -555,9 +585,6 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
 
     public boolean isDigging() {return this.entityData.get(IS_DIGGING);}
     public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}
-
-    @Override public int  attackAnimationTimeout() { return this.attackAnimationTimeout; }
-    @Override public void setAttackAnimationTimeout(int v) { this.attackAnimationTimeout = v; }
 
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
         return rnd.nextInt(3) != 0;
@@ -586,5 +613,9 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker {
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
+    }
+
+    public boolean isIdleLocked() {
+        return getIdleVariant() != IdleVariant.NONE;
     }
 }

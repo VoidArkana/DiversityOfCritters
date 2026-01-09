@@ -20,15 +20,13 @@ public class BrushItem extends Item {
         if (pInteractionTarget instanceof DiverseCritter critter) {
             if (critter.getHygiene() < critter.maxHygiene()) {
                 if (!pPlayer.level().isClientSide) {
-                    critter.setHygiene(Math.min(critter.maxHygiene(), critter.getHygiene() + 50));
+                    critter.setHygiene(Math.min(critter.maxHygiene(), critter.getHygiene() + 500));
 
                     pPlayer.level().playSound(null, critter.blockPosition(), SoundEvents.WOOL_PLACE, SoundSource.PLAYERS, 0.5f, 1.2f);
 
                     pStack.hurtAndBreak(1, pPlayer, (player) -> player.broadcastBreakEvent(pUsedHand));
 
-                    pPlayer.getCooldowns().addCooldown(this, 1200);
                 }
-
                 return InteractionResult.sidedSuccess(pPlayer.level().isClientSide);
             }
         }

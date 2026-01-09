@@ -19,32 +19,27 @@ public class SleepBehaviorGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (entity.isInWater() || entity.isVehicle() || entity.isCleaning() || entity.isOrderedToSit()) { //Attacking
+        if (entity.isInWater() || entity.isVehicle() || entity.isAttacking() || entity.isCleaning() || entity.isOrderedToSit()) {
             return false;
         }
 
-        // Lógica de Horario
         long time = entity.level().getDayTime() % 24000;
         boolean isNight = time >= 13000 && time < 23000;
 
-        // Si es diurno duerme de noche, si es nocturno duerme de día
         return entity.isDiurnal() ? isNight : !isNight;
     }
 
     @Override
     public boolean canContinueToUse() {
-        // 1. Si estamos despertando, seguimos hasta que acabe la animación
         if (entity.getSleepState() == SleepState.AWAKENING) {
             return timer < wakeDuration;
         }
 
-        // 2. Interrupciones: Daño o Agua
         if (entity.hurtTime > 0 || entity.isInWater()) {
             startWaking();
-            return true; // Continuamos para procesar el despertar
+            return true;
         }
 
-        // 3. Chequeo de Horario (Despertar si cambió el día)
         long time = entity.level().getDayTime() % 24000;
         boolean isNight = time >= 13000 && time < 23000;
         boolean shouldBeAsleep = entity.isDiurnal() ? isNight : !isNight;
@@ -63,14 +58,12 @@ public class SleepBehaviorGoal extends Goal {
         this.prepareDuration = entity.getPreparingSleepDuration();
         this.wakeDuration = entity.getAwakeningDuration();
 
-        // INICIO: Transición a PREPARING
         entity.setSleepState(SleepState.PREPARING);
         this.timer = 0;
     }
 
     @Override
     public void stop() {
-        // Al terminar (por cualquier razón), estado AWAKE
         entity.setSleepState(SleepState.AWAKE);
     }
 
@@ -82,7 +75,6 @@ public class SleepBehaviorGoal extends Goal {
 
         switch (current) {
             case PREPARING:
-                // Transición: Preparing -> Sleeping
                 if (timer >= prepareDuration) {
                     entity.setSleepState(SleepState.SLEEPING);
                     timer = 0;
@@ -90,15 +82,11 @@ public class SleepBehaviorGoal extends Goal {
                 break;
 
             case SLEEPING:
-                // En este estado simplemente esperamos.
-                // Las condiciones de salida están en canContinueToUse()
                 entity.getNavigation().stop();
                 break;
 
             case AWAKENING:
-                // Transición: Awakening -> Fin del Goal (stop() pone AWAKE)
                 if (timer >= wakeDuration) {
-                    // No hacemos nada, canContinueToUse devolverá false en el siguiente tick
                 }
                 break;
 

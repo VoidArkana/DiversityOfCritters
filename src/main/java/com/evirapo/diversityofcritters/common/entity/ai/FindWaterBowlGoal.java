@@ -107,7 +107,6 @@ public class FindWaterBowlGoal extends Goal {
         Vec3 dm = critter.getDeltaMovement();
         critter.setDeltaMovement(0, dm.y, 0);
 
-        // mirar hacia el bowl
         critter.getLookControl().setLookAt(
                 bowlCenter.x,
                 bowlCenter.y + 0.1D,

@@ -18,9 +18,11 @@ public class CivetCleanGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() || entity.isAttacking() || entity.isOrderedToSit()) {
+        if (entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() ||
+                entity.isAttacking() || entity.isOrderedToSit() || entity.isIdleLocked()) {
             return false;
         }
+
         if (entity.getHygiene() >= entity.maxHygiene()) {
             return false;
         }
@@ -31,6 +33,11 @@ public class CivetCleanGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() ||
+                entity.isAttacking() || entity.isOrderedToSit()) {
+            return false;
+        }
+
         return cleanTimer > 0 && entity.getHygiene() < entity.maxHygiene();
     }
 
@@ -50,10 +57,8 @@ public class CivetCleanGoal extends Goal {
     @Override
     public void tick() {
         this.cleanTimer--;
-
         if (this.cleanTimer == 1) {
             int recovery = entity.hasLowHygiene() ? 600 : 400;
-
             this.entity.setHygiene(Math.min(this.entity.maxHygiene(), this.entity.getHygiene() + recovery));
         }
     }

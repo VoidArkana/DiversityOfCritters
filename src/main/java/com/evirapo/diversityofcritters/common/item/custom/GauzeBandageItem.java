@@ -1,6 +1,5 @@
 package com.evirapo.diversityofcritters.common.item.custom;
 
-import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -19,17 +18,17 @@ public class GauzeBandageItem extends Item {
 
     @Override
     public InteractionResult interactLivingEntity(ItemStack pStack, Player pPlayer, LivingEntity pInteractionTarget, InteractionHand pUsedHand) {
-        if (pInteractionTarget instanceof DiverseCritter critter && critter.getHealth() < critter.getMaxHealth()) {
+        if (pInteractionTarget.getHealth() < pInteractionTarget.getMaxHealth()) {
             if (!pPlayer.level().isClientSide) {
-                critter.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 1200, 1));
+                pInteractionTarget.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 1200, 1));
 
-                pPlayer.level().playSound(null, critter.blockPosition(), SoundEvents.ARMOR_EQUIP_LEATHER, SoundSource.PLAYERS, 1.0f, 1.0f);
+                pPlayer.level().playSound(null, pInteractionTarget.blockPosition(), SoundEvents.ARMOR_EQUIP_LEATHER, SoundSource.PLAYERS, 1.0f, 1.0f);
 
                 if (!pPlayer.getAbilities().instabuild) {
                     pStack.shrink(1);
                 }
 
-                pPlayer.getCooldowns().addCooldown(this, 1200);
+                pPlayer.getCooldowns().addCooldown(this, 20);
             }
             return InteractionResult.sidedSuccess(pPlayer.level().isClientSide);
         }
