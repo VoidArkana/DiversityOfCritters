@@ -31,17 +31,11 @@ public class SetDiurnalMsg {
 
             var level = player.level();
             var e = level.getEntity(msg.entityId);
+
             if (e instanceof com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter critter) {
                 critter.setDiurnal(msg.diurnal);
-                System.out.println("[SLEEP][SVR][GUI] SetDiurnal entity#" + critter.getId() + " -> " + msg.diurnal);
 
-                if (critter.sleepController != null) {
-                    critter.sleepController.interruptSleep("ui_toggle", critter.tickCount);
-                } else {
-                    critter.setPreparingSleep(false);
-                    critter.setSleeping(false);
-                    critter.setAwakeing(false);
-                }
+                System.out.println("[SLEEP][SVR][GUI] SetDiurnal entity#" + critter.getId() + " -> " + msg.diurnal);
             }
         });
         ctx.setPacketHandled(true);

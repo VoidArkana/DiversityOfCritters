@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.client.models;
 
 import com.evirapo.diversityofcritters.client.animations.CivetAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
@@ -107,13 +108,13 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	public void setupAnim(CivetEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
 		this.root().getAllParts().forEach(ModelPart::resetPose);
 
-		boolean sleepingLike = entity.isPreparingSleep() || entity.isSleeping() || entity.isAwakeing();
+		boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
 
 		this.animate(entity.preparingSleepState, CivetAnims.PREPARING_SLEEP, ageInTicks, 1f);
 		this.animate(entity.sleepState,          CivetAnims.SLEEP,          ageInTicks, 1f);
 		this.animate(entity.awakeningState,      CivetAnims.AWAKENING,      ageInTicks, 1f);
 
-		if (entity.idleAnimationState.isStarted() && limbSwingAmount <= 0.01f && !entity.isInSittingPose()) {
+		if (!sleepingLike && entity.idleAnimationState.isStarted() && limbSwingAmount <= 0.01f && !entity.isInSittingPose()) {
 			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
 			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
 		}
@@ -128,27 +129,28 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
 		this.climbing = entity.isClimbing();
 
-		if (entity.isClimbing()){
-			this.animate(entity.climbingUpState, CivetAnims.CLIMBING_UP, ageInTicks, 1.0F);
-
-			if (entity.isClimbingUp()) {
-				this.animateWalk(CivetAnims.CLIMBING_UP, limbSwing, Math.max(0.1f, limbSwingAmount), 2.0f, 2.5f);
-			}
-		} else {
-			if (entity.isInWaterOrBubble()){
-				this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
-			} else {
-				if (limbSwingAmount > 0.01f) {
-					this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+		if (!sleepingLike) {
+			if (entity.isClimbing()){
+				this.animate(entity.climbingUpState, CivetAnims.CLIMBING_UP, ageInTicks, 1.0F);
+				if (entity.isClimbingUp()) {
+					this.animateWalk(CivetAnims.CLIMBING_UP, limbSwing, Math.max(0.1f, limbSwingAmount), 2.0f, 2.5f);
 				}
+			} else {
+				if (entity.isInWaterOrBubble()){
+					this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
+				} else {
+					if (limbSwingAmount > 0.01f) {
+						this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+					}
 
-				this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
+					this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
 
-				this.animate(entity.idleStandUpState,    CivetAnims.STAND_UP,   ageInTicks, 1.0F);
-				this.animate(entity.idleSniffLeftState,  CivetAnims.SNIFF_LEFT, ageInTicks, 1.0F);
-				this.animate(entity.idleSniffRightState, CivetAnims.SNIFF_RIGHT,ageInTicks, 1.0F);
-				this.animate(entity.idleSitState,        CivetAnims.SIT,        ageInTicks, 1.0F);
-				this.animate(entity.idleLayState,        CivetAnims.LAY,        ageInTicks, 1.0F);
+					this.animate(entity.idleStandUpState,    CivetAnims.STAND_UP,   ageInTicks, 1.0F);
+					this.animate(entity.idleSniffLeftState,  CivetAnims.SNIFF_LEFT, ageInTicks, 1.0F);
+					this.animate(entity.idleSniffRightState, CivetAnims.SNIFF_RIGHT,ageInTicks, 1.0F);
+					this.animate(entity.idleSitState,        CivetAnims.SIT,        ageInTicks, 1.0F);
+					this.animate(entity.idleLayState,        CivetAnims.LAY,        ageInTicks, 1.0F);
+				}
 			}
 		}
 
