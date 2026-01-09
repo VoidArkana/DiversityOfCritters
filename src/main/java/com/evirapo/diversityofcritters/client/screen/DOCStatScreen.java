@@ -46,10 +46,11 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         int k = (this.width - this.imageWidth) / 2;
         int l = (this.height - this.imageHeight) / 2;
 
-        int buttonsY = l + 107;
+        int buttonsY = l + 46;
+        int buttonsX = k + 10;
 
         this.sunBtn = new ImageButton(
-                k + 13, buttonsY, 16, 16,
+                buttonsX, buttonsY, 16, 16,
                 0, 0, 16, SUN_ICON, 16, 16,
                 btn -> sendSetDiurnal(true),
                 Component.translatable("screen.diversityofcritters.diurnal")
@@ -57,7 +58,7 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         this.addRenderableWidget(this.sunBtn);
 
         this.moonBtn = new ImageButton(
-                k + 33, buttonsY, 16, 16,
+                buttonsX + 13, buttonsY, 16, 16, // Espaciado de 20 px
                 0, 0, 16, MOON_ICON, 16, 16,
                 btn -> sendSetDiurnal(false),
                 Component.translatable("screen.diversityofcritters.nocturnal")
@@ -65,7 +66,7 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         this.addRenderableWidget(this.moonBtn);
 
         this.releaseBtn = new ImageButton(
-                k + 53, buttonsY, 16, 16,
+                buttonsX + 26, buttonsY, 16, 16, // Espaciado de 40 px
                 0, 0, 16, RELEASE_ICON, 16, 16,
                 btn -> sendRelease(),
                 Component.translatable("screen.diversityofcritters.release")
@@ -86,7 +87,6 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         }
     }
 
-    // ... (Mantén los métodos de mouseClicked, mouseReleased, mouseDragged, etc. iguales) ...
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         boolean handled = false;
@@ -187,18 +187,19 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         float hungerPercent = ((float) entity.getHungerPercentage() / 100);
         float thirstPercent = ((float) entity.getThirstPercentage() / 100);
         float enrichmentPercent = ((float) entity.getEnrichmentPercentage() / 100);
+        float hygienePercent = ((float) entity.getHygienePercentage() / 100);
 
         int hungerWidth = (int) (102 * hungerPercent);
         int thirstWidth = (int) (102 * thirstPercent);
         int enrichmentWidth = (int) (102 * enrichmentPercent);
+        int hygieneWidth = (int) (102 * hygienePercent);
 
         graphics.blit(BOOK_LOCATION, k, l, 0, 0, 128, 128, 128, 128);
 
         graphics.blit(BARS_LOCATION, k + 13, l + 61, 13, 61, hungerWidth, 13, 128, 128);
-
         graphics.blit(BARS_LOCATION, k + 13, l + 77, 13, 77, thirstWidth, 13, 128, 128);
-
         graphics.blit(BARS_LOCATION, k + 13, l + 93, 13, 93, enrichmentWidth, 13, 128, 128);
+        graphics.blit(BARS_LOCATION, k + 13, l + 109, 13, 109, hygieneWidth, 13, 128, 128);
 
         InventoryScreen.renderEntityInInventoryFollowsMouse(graphics, k + 30, l + 40, 50, -mouseX + k + 35, -mouseY + l + 30, entity);
     }
@@ -253,6 +254,10 @@ public class DOCStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         Component enrichmentKey = Component.translatable("screen.diversityofcritters.enrichment");
         String enrichment = enrichmentKey.getString();
         graphics.drawString(this.font, enrichment, this.imageWidth / 2 - this.font.width(enrichment) / 2 + xOffset - 5, 154, 0XFFFFFF, true);
+
+        Component hygieneKey = Component.translatable("screen.diversityofcritters.hygiene");
+        String hygiene = hygieneKey.getString();
+        graphics.drawString(this.font, hygiene, this.imageWidth / 2 - this.font.width(hygiene) / 2 + xOffset - 5, 186, 0XFFFFFF, true);
 
         pose.popPose();
     }

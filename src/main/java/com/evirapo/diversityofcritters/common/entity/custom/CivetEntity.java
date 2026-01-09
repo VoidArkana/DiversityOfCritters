@@ -69,6 +69,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     public final AnimationState attackAnimationState = new AnimationState();
     public final AnimationState drinkingAnimationState = new AnimationState();
     public final AnimationState diggingAnimationState = new AnimationState();
+    public final AnimationState cleanAnimationState = new AnimationState();
 
     private enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
 
@@ -137,6 +138,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
 
         this.goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
+
+        this.goalSelector.addGoal(1, new CivetCleanGoal(this));
 
         this.goalSelector.addGoal(2, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
             @Override public boolean canUse() {
@@ -503,7 +506,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
 
         boolean idleBase = this.isAlive()
                 && !sleepingLike && !moving && !swimming && !climbing
-                && !doingAttack && !drinking && !hasTarget && onGround;
+                && !doingAttack && !drinking && !hasTarget && onGround
+                && !this.isCleaning();
 
         IdleVariant current = getIdleVariant();
 
@@ -570,7 +574,8 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         boolean softIdle = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
                 && !doingAttack && !drinking && !hasTarget
-                && !this.isDigging() && getIdleVariant() == IdleVariant.NONE;
+                && !this.isDigging() && getIdleVariant() == IdleVariant.NONE
+                && !this.isCleaning();
 
         this.idleAnimationState.animateWhen(softIdle, this.tickCount);
 
@@ -581,6 +586,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
         this.idleSitState.animateWhen(       v == IdleVariant.SIT,         this.tickCount);
         this.idleLayState.animateWhen(       v == IdleVariant.LAY,         this.tickCount);
 
+        this.cleanAnimationState.animateWhen(this.isCleaning(), this.tickCount);
         this.climbingUpState.animateWhen(this.isClimbingUp(), this.tickCount);
         this.drinkingAnimationState.animateWhen(this.isAlive() && this.IsDrinking(), this.tickCount);
         this.diggingAnimationState.animateWhen(this.isDigging(), this.tickCount);
@@ -637,6 +643,7 @@ public class CivetEntity extends DiverseCritter implements IAnimatedAttacker, IS
     @Override public int maxHunger() { return 4000; }
     @Override public int maxThirst() { return 4000; }
     @Override public int maxEnrichment() { return 4000; }
+    @Override public int maxHygiene() { return 4000; }
 
     @Override public boolean isAttacking() { return this.entityData.get(IS_ATTACKING); }
     @Override public void setAttacking(boolean v) { this.entityData.set(IS_ATTACKING, v); }

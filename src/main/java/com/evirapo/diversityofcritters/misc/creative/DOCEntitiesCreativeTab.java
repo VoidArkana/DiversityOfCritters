@@ -36,6 +36,8 @@ public class DOCEntitiesCreativeTab {
                         output.accept(DOCItems.TRAINING_STICK.get());
                         output.accept(DOCItems.BOWL.get());
                         output.accept(DOCItems.DIG_BOX.get());
+                        output.accept(DOCItems.BRUSH.get());
+                        output.accept(DOCItems.GAUZE_BANDAGE.get());
 
                     })
                     .build());

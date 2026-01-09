@@ -8,6 +8,9 @@
   "entity.diversityofcritters.civet" : "Banded Palm Civet",
   "item.diversityofcritters.civet_spawn_egg" : "Banded Palm Civet Spawn Egg",
 
+  "item.diversityofcritters.brush": "Cleaning Brush",
+  "item.diversityofcritters.gauze_bandage": "Gauze Bandage",
+
   "item.diversityofcritters.zoo_book" : "Zoological Book",
   "item.diversityofcritters.training_stick": "Training Stick",
   "block.diversityofcritters.bowl": "Bowl",
@@ -24,6 +27,7 @@
   "screen.diversityofcritters.thirst": "Thirst",
   "screen.diversityofcritters.hunger": "Hunger",
   "screen.diversityofcritters.enrichment": "Enrichment",
+  "screen.diversityofcritters.hygiene": "Hygiene",
 
   "screen.diversityofcritters.age": "Age",
   "screen.diversityofcritters.is_baby.true": "Baby",

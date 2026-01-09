@@ -113,8 +113,10 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.animate(entity.sleepState,          CivetAnims.SLEEP,          ageInTicks, 1f);
 		this.animate(entity.awakeningState,      CivetAnims.AWAKENING,      ageInTicks, 1f);
 
-		this.Head.xRot = headPitch * ((float)Math.PI / 180F);
-		this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
+		if (entity.idleAnimationState.isStarted() && limbSwingAmount <= 0.01f && !entity.isInSittingPose()) {
+			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
+			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
+		}
 
 		if (sleepingLike) {
 			limbSwing = 0f;
@@ -136,7 +138,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			if (entity.isInWaterOrBubble()){
 				this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
 			} else {
-				// En tierra
 				if (limbSwingAmount > 0.01f) {
 					this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
 				}
@@ -151,6 +152,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			}
 		}
 
+		this.animate(entity.cleanAnimationState, CivetAnims.SCRATCHING, ageInTicks, 1.0F);
 		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
 		this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
 		this.animate(entity.sitState,   CivetAnims.SIT, ageInTicks, 1.0F);
@@ -160,8 +162,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			this.applyStatic(CivetAnims.BABY);
 		}
 	}
-
-
 
 	@Override
 	public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {

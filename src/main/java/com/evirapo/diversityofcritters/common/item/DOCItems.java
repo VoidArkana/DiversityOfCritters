@@ -3,6 +3,8 @@ package com.evirapo.diversityofcritters.common.item;
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
+import com.evirapo.diversityofcritters.common.item.custom.BrushItem;
+import com.evirapo.diversityofcritters.common.item.custom.GauzeBandageItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeSpawnEggItem;
@@ -35,6 +37,12 @@ public class DOCItems {
 
     public static final RegistryObject<Item> DIG_BOX = ITEM_TYPES.register("dig_box",
             () -> new BlockItem(DOCBlocks.DIG_BOX.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> BRUSH = ITEM_TYPES.register("brush",
+            () -> new BrushItem(new Item.Properties().stacksTo(1).durability(64))); // Durabilidad 64 usos
+
+    public static final RegistryObject<Item> GAUZE_BANDAGE = ITEM_TYPES.register("gauze_bandage",
+            () -> new GauzeBandageItem(new Item.Properties().stacksTo(16))); // Stackeable hasta 16
 
     public static void register(IEventBus eventBus) {
         ITEM_TYPES.register(eventBus);
