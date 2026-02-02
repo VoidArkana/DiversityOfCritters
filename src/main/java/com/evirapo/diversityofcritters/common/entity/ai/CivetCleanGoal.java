@@ -9,7 +9,7 @@ public class CivetCleanGoal extends Goal {
 
     private final CivetEntity entity;
     private int cleanTimer;
-    private final int CLEAN_DURATION = 100;
+    private final int CLEAN_DURATION = 80;
 
     public CivetCleanGoal(CivetEntity entity) {
         this.entity = entity;

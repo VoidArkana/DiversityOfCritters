@@ -109,8 +109,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.root().getAllParts().forEach(ModelPart::resetPose);
 
 		boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
-
-		boolean orderedSit = entity.isOrderedToSit();
+		boolean orderedSit = entity.isOrderedToSit() || (entity.isInSittingPose() && !entity.isWandering());
 
 		this.animate(entity.preparingSleepState, CivetAnims.PREPARING_SLEEP, ageInTicks, 1f);
 		this.animate(entity.sleepState,          CivetAnims.SLEEP,          ageInTicks, 1f);
@@ -165,12 +164,12 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 				this.animate(entity.idleStandUpState,    CivetAnims.STAND_UP,   ageInTicks, 1.0F);
 				this.animate(entity.idleSniffLeftState,  CivetAnims.SNIFF_LEFT, ageInTicks, 1.0F);
 				this.animate(entity.idleSniffRightState, CivetAnims.SNIFF_RIGHT,ageInTicks, 1.0F);
-				this.animate(entity.idleSitState,        CivetAnims.SIT,        ageInTicks, 1.0F); // Este es el Sit ALEATORIO
+				this.animate(entity.idleSitState,        CivetAnims.SIT,        ageInTicks, 1.0F);
 				this.animate(entity.idleLayState,        CivetAnims.LAY,        ageInTicks, 1.0F);
 			}
 		}
 
-		this.animate(entity.cleanAnimationState, CivetAnims.SCRATCHING, ageInTicks, 1.0F);
+		this.animate(entity.cleanAnimationState, CivetAnims.GROOMING, ageInTicks, 1.0F);
 		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
 		this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
 		this.animate(entity.diggingAnimationState,   CivetAnims.DIGGING, ageInTicks, 1.0F);

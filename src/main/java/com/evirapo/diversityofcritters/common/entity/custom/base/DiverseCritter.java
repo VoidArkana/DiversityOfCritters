@@ -311,10 +311,25 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             if (sitState.isStarted()) sitState.stop();
             return;
         }
-        if (this.isInSittingPose() && !this.isWandering()) {
-            if (!sitState.isStarted()) sitState.start(this.tickCount);
-        } else {
-            if (sitState.isStarted()) sitState.stop();
+
+        boolean isOrdered = this.isOrderedToSit();
+        boolean inPose = this.isInSittingPose();
+        boolean wandering = this.isWandering();
+        boolean isStarted = sitState.isStarted();
+
+        boolean shouldSit = isOrdered || (inPose && !wandering);
+
+        if (this.tickCount % 40 == 0) {
+            // Descomenta la siguiente línea para ver el estado constante
+            // System.out.println("[CRITTER-ANIM] Tick: " + this.tickCount + " | Ordered: " + isOrdered + " | InPose: " + inPose + " | Wandering: " + wandering + " | ShouldSit: " + shouldSit + " | AnimStarted: " + isStarted);
+        }
+
+        if (shouldSit && !isStarted) {
+            System.out.println("[CRITTER-ANIM-ERROR] Intentando INICIAR animacion Sit. (Ordered: " + isOrdered + ", InPose: " + inPose + ")");
+            sitState.start(this.tickCount);
+        } else if (!shouldSit && isStarted) {
+            System.out.println("[CRITTER-ANIM] Deteniendo animacion Sit.");
+            sitState.stop();
         }
     }
 
@@ -384,6 +399,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     }
 
     protected void setModeSit(boolean sit) {
+        System.out.println("[CRITTER-SETMODE] setModeSit llamado con: " + sit + " (Remote/Client: " + this.level().isClientSide() + ")");
         this.setWandering(false);
         this.setOrderedToSit(sit);
         this.setInSittingPose(sit);

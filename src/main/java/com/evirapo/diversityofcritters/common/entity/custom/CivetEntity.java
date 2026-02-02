@@ -31,7 +31,6 @@ import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.entity.animal.Chicken;
-import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
