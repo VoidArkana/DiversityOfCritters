@@ -4,19 +4,18 @@ import com.evirapo.diversityofcritters.client.animations.CivetBabyAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.animation.AnimationDefinition; // Importante
-import net.minecraft.client.animation.KeyframeAnimations; // Importante
+import net.minecraft.client.animation.AnimationDefinition;
+import net.minecraft.client.animation.KeyframeAnimations;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
-import net.minecraft.world.entity.AnimationState; // Importante
-import org.joml.Vector3f; // Importante
+import net.minecraft.world.entity.AnimationState;
+import org.joml.Vector3f;
 
 public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> {
     private final ModelPart Bandedpalmcivetkit;
 
-    // Cache para vectores de animación (Optimización necesaria para el sistema de mezcla)
     private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
 
     public CivetBabyModel(ModelPart root) {
@@ -24,7 +23,7 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
     }
 
     public static LayerDefinition createBodyLayer() {
-        // ... (Tu definición de capas y huesos queda EXACTAMENTE IGUAL) ...
+        // ... (Tu definición de capas queda IGUAL, no la toques) ...
         MeshDefinition meshdefinition = new MeshDefinition();
         PartDefinition partdefinition = meshdefinition.getRoot();
 
@@ -59,7 +58,7 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
     public void setupAnim(CivetEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
         this.root().getAllParts().forEach(ModelPart::resetPose);
 
-        float idleWeight = 1.0F - Math.min(1.0F, limbSwingAmount * 4.0F);
+        float idleWeight = 1.0F - Math.min(1.0F, limbSwingAmount * 20.0F);
         float walkWeight = 1.0F - idleWeight;
 
         if (idleWeight > 0) {
@@ -67,7 +66,7 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
         }
 
         if (walkWeight > 0) {
-            this.animateWalkWithWeight(CivetBabyAnims.move, limbSwing, limbSwingAmount, 4.0f, 2.5f, walkWeight);
+            this.animateCrawling(CivetBabyAnims.move, limbSwing, limbSwingAmount, 8.0f, walkWeight);
         }
 
         this.animate(entity.preparingSleepState, CivetBabyAnims.preparing_sleep, ageInTicks, 1f);
@@ -79,7 +78,6 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
         this.animate(entity.stoppingCryState,  CivetBabyAnims.stopping_cry,  ageInTicks, 1f);
     }
 
-
     protected void animateWithWeight(AnimationState state, AnimationDefinition definition, float ageInTicks, float speed, float weight) {
         state.updateTime(ageInTicks, speed);
         state.ifStarted(s -> {
@@ -87,9 +85,10 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
         });
     }
 
-    protected void animateWalkWithWeight(AnimationDefinition definition, float limbSwing, float limbSwingAmount, float speed, float intensity, float weight) {
-        long time = (long)(limbSwing * 50.0F * speed);
-        float finalScale = Math.min(limbSwingAmount * intensity, 1.0F) * weight;
+    protected void animateCrawling(AnimationDefinition definition, float limbSwing, float limbSwingAmount, float speedMultiplier, float weight) {
+        long time = (long)(limbSwing * 50.0F * speedMultiplier);
+        float finalScale = 1.0F * weight;
+
         KeyframeAnimations.animate(this, definition, time, finalScale, ANIMATION_VECTOR_CACHE);
     }
 

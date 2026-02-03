@@ -97,6 +97,7 @@ public class CivetEntity extends DiverseCritter {
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
+        this.moveControl = new CivetMoveControl(this);
     }
 
     // --- SETUP ---
@@ -267,6 +268,14 @@ public class CivetEntity extends DiverseCritter {
 
         if (!this.level().isClientSide) {
             this.setClimbing(this.horizontalCollision && (this.isClimbableX || this.isClimbableZ));
+
+            double desiredSpeed = this.isNewborn() ? 0.095D : 0.2D;
+
+            if (this.getAttribute(Attributes.MOVEMENT_SPEED).getBaseValue() != desiredSpeed) {
+                this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(desiredSpeed);
+            }
+            // --------------------------------------------
+
             serverHandleIdleVariant();
 
             if (this.isNewborn() && this.getHunger() < 3000) {
@@ -306,6 +315,7 @@ public class CivetEntity extends DiverseCritter {
             handleCryingAnimationClient();
         }
     }
+
     @Override
     public void aiStep() {
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);

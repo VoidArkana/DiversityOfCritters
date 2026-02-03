@@ -27,7 +27,7 @@ public class FindCryingBabyGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (parent.isBaby() || parent.isSleeping() || parent.isOrderedToSit() || parent.isPassenger()) {
+        if (parent.isBaby() || parent.isSleeping() || parent.isOrderedToSit() || parent.isPassenger() || parent.getIsMale()) {
             return false;
         }
 
