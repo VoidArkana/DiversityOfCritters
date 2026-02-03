@@ -111,6 +111,16 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
 		boolean orderedSit = entity.isOrderedToSit() || (entity.isInSittingPose() && !entity.isWandering());
 
+		if (entity.isJuvenile()) {
+			this.Head.xScale = 1.05F;
+			this.Head.yScale = 1.05F;
+			this.Head.zScale = 1.05F;
+		} else {
+			this.Head.xScale = 1.0F;
+			this.Head.yScale = 1.0F;
+			this.Head.zScale = 1.0F;
+		}
+
 		this.animate(entity.preparingSleepState, CivetAnims.PREPARING_SLEEP, ageInTicks, 1f);
 		this.animate(entity.sleepState,          CivetAnims.SLEEP,          ageInTicks, 1f);
 		this.animate(entity.awakeningState,      CivetAnims.AWAKENING,      ageInTicks, 1f);
@@ -183,13 +193,9 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
 		poseStack.pushPose();
 
-		if (this.young){
-			poseStack.scale(0.2f, 0.2f, 0.2f);
-			poseStack.translate(0, 6, 0);
-		}else {
-			poseStack.scale(0.4f, 0.4f, 0.4f);
-			poseStack.translate(0, 2.25, 0);
-		}
+		float baseScale = 0.5f;
+		poseStack.scale(baseScale, baseScale, baseScale);
+		poseStack.translate(0, 1.65F, 0);
 
 		if (this.climbing){
 			poseStack.mulPose(Axis.XP.rotationDegrees(-90));

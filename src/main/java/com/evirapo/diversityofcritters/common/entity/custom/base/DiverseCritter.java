@@ -51,6 +51,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Boolean> IS_MALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
 
+    private static final EntityDataAccessor<Boolean> IS_JUVENILE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
+
     // Stats
     private static final EntityDataAccessor<Integer> HUNGER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> THIRST = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
@@ -61,7 +63,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Boolean> DRINKING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Optional<BlockPos>> DRINK_POS = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
     private static final EntityDataAccessor<Boolean> CLEANING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
-    // NUEVO: Estado de Ataque movido aquí
     private static final EntityDataAccessor<Boolean> ATTACKING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
     // Sleep States
@@ -70,6 +71,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     // AI States
     protected static final EntityDataAccessor<Boolean> WANDERING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> IS_CRYING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
     // --- VARIABLES ---
     int prevHunger;
@@ -79,9 +81,11 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private double thirstLossAccum = 0.0;
     private double enrichmentLossAccum = 0.0;
     private double hygieneLossAccum = 0.0;
-
-    // NUEVO: Variable de timeout de animación de ataque
     public int attackAnimationTimeout = 0;
+
+    public static final int TICKS_PER_DAY = 24000;
+    public static final int TOTAL_GROWTH_TIME = 8 * TICKS_PER_DAY;
+    public static final int JUVENILE_AGE_THRESHOLD = -4 * TICKS_PER_DAY;
 
     // Animation States (Client)
     public final AnimationState preparingSleepState = new AnimationState();
@@ -126,15 +130,14 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(HYGIENE, maxHygiene());
         this.entityData.define(DRINKING, false);
         this.entityData.define(CLEANING, false);
-        // NUEVO: Definición de ATTACKING
         this.entityData.define(ATTACKING, false);
         this.entityData.define(DRINK_POS, Optional.empty());
         this.entityData.define(DATA_FLAGS_ID, (byte)0);
-
         this.entityData.define(SLEEP_STATE_ID, SleepState.AWAKE.getId());
-
         this.entityData.define(DIURNAL, getDefaultDiurnal());
         this.entityData.define(WANDERING, false);
+        this.entityData.define(IS_JUVENILE, false);
+        this.entityData.define(IS_CRYING, false);
     }
 
     @Override
@@ -146,9 +149,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         pCompound.putInt("Enrichment", this.getEnrichment());
         pCompound.putInt("Hygiene", this.getHygiene());
         pCompound.putBoolean("Cleaning", this.isCleaning());
-
         pCompound.putInt("SleepState", this.getSleepState().getId());
-
         pCompound.putBoolean("Diurnal", this.isDiurnal());
         pCompound.putBoolean("Wandering", this.isWandering());
     }
@@ -156,20 +157,25 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     @Override
     public void readAdditionalSaveData(CompoundTag pCompound) {
         super.readAdditionalSaveData(pCompound);
-        this.setIsMale(pCompound.getBoolean("IsMale"));
-        this.setHunger(pCompound.getInt("Hunger"));
-        this.setThirst(pCompound.getInt("Thirst"));
-        this.setEnrichment(pCompound.getInt("Enrichment"));
+
+        if (pCompound.contains("IsMale")) this.setIsMale(pCompound.getBoolean("IsMale"));
+
+        if (pCompound.contains("Hunger")) this.setHunger(pCompound.getInt("Hunger"));
+        if (pCompound.contains("Thirst")) this.setThirst(pCompound.getInt("Thirst"));
+        if (pCompound.contains("Enrichment")) this.setEnrichment(pCompound.getInt("Enrichment"));
+
         if (pCompound.contains("Hygiene")) {
             this.setHygiene(pCompound.getInt("Hygiene"));
         }
+
         this.setCleaning(pCompound.getBoolean("Cleaning"));
 
         if (pCompound.contains("SleepState")) {
             this.setSleepState(SleepState.byId(pCompound.getInt("SleepState")));
         }
-
-        this.setDiurnal(pCompound.getBoolean("Diurnal"));
+        if (pCompound.contains("Diurnal")) {
+            this.setDiurnal(pCompound.getBoolean("Diurnal"));
+        }
         this.setWandering(pCompound.getBoolean("Wandering"));
     }
 
@@ -208,11 +214,16 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public void setWandering(boolean value) { this.entityData.set(WANDERING, value); }
     public boolean isFollowing() { return !this.isOrderedToSit() && !this.isWandering(); }
 
-    // NUEVO: Implementación de IAnimatedAttacker en la clase base
     @Override public boolean isAttacking() { return this.entityData.get(ATTACKING); }
     @Override public void setAttacking(boolean attacking) { this.entityData.set(ATTACKING, attacking); }
     @Override public int attackAnimationTimeout() { return this.attackAnimationTimeout; }
     @Override public void setAttackAnimationTimeout(int timeout) { this.attackAnimationTimeout = timeout; }
+
+    public boolean isJuvenile() {return this.entityData.get(IS_JUVENILE);}
+    public boolean isNewborn() {return this.isBaby() && !isJuvenile();}
+
+    public boolean isCrying() { return this.entityData.get(IS_CRYING); }
+    public void setCrying(boolean val) { this.entityData.set(IS_CRYING, val); }
 
     // Sleep Accessors
     public SleepState getSleepState() { return SleepState.byId(this.entityData.get(SLEEP_STATE_ID)); }
@@ -236,8 +247,17 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     // --- MAIN TICK ---
     @Override
     public void tick() {
+        super.tick();
+
         if (!this.level().isClientSide()) {
-            // Stats Decay
+            int currentAge = this.getAge();
+
+            boolean isJuvenileServer = currentAge < 0 && currentAge >= JUVENILE_AGE_THRESHOLD;
+
+            if (this.entityData.get(IS_JUVENILE) != isJuvenileServer) {
+                this.entityData.set(IS_JUVENILE, isJuvenileServer);
+            }
+
             if (this.getHunger() > 0) {
                 double lossPerTick = getHungerLossPerSecond() / 20.0;
                 hungerLossAccum += lossPerTick;
@@ -283,8 +303,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             updateSitAnimationClient();
             handleSleepAnimationsClient();
         }
-
-        super.tick();
     }
 
     // --- ANIMATION LOGIC (CLIENT) ---
@@ -490,5 +508,10 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
 
         return this.isInLove() && otherCritter.isInLove();
+    }
+
+    @Override
+    public void setBaby(boolean pBaby) {
+        this.setAge(pBaby ? -TOTAL_GROWTH_TIME : 0);
     }
 }

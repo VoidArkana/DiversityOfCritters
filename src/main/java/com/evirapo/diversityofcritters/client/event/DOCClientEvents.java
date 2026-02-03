@@ -1,10 +1,7 @@
 package com.evirapo.diversityofcritters.client.event;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
-import com.evirapo.diversityofcritters.client.models.CivetModel;
-import com.evirapo.diversityofcritters.client.models.LionCubModel;
-import com.evirapo.diversityofcritters.client.models.LionModel;
-import com.evirapo.diversityofcritters.client.models.ModelLayers;
+import com.evirapo.diversityofcritters.client.models.*;
 import com.evirapo.diversityofcritters.client.renderer.CivetRenderer;
 import com.evirapo.diversityofcritters.client.renderer.LionRenderer;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
@@ -24,6 +21,7 @@ public class DOCClientEvents {
         event.registerLayerDefinition(ModelLayers.LION_CUB_LAYER, LionCubModel::createBodyLayer);
 
         event.registerLayerDefinition(ModelLayers.CIVET_LAYER, CivetModel::createBodyLayer);
+        event.registerLayerDefinition(ModelLayers.CIVET_BABY_LAYER, CivetBabyModel::createBodyLayer);
     }
 
     @SubscribeEvent

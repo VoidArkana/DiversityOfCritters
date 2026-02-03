@@ -68,6 +68,9 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState drinkingAnimationState = new AnimationState();
     public final AnimationState diggingAnimationState = new AnimationState();
     public final AnimationState cleanAnimationState = new AnimationState();
+    public final AnimationState preparingCryState = new AnimationState();
+    public final AnimationState cryingState = new AnimationState();
+    public final AnimationState stoppingCryState = new AnimationState();
 
     // --- IDLE VARIANTS ENUM ---
     private enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
@@ -82,11 +85,13 @@ public class CivetEntity extends DiverseCritter {
 
     // --- VARIABLES ---
     private int idleVariantCooldown = 0;
-    // attackAnimationTimeout movido a DiverseCritter
     public boolean isClimbableX;
     public boolean isClimbableZ;
     private LookForFoodItems forFoodGoal;
     private int tamingFeedsLeft = 0;
+    private int cryTimer = 0;
+    private int stopCryTimer = 0;
+    private boolean wasCryingClient = false;
 
     // --- CONSTRUCTOR ---
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
@@ -98,7 +103,6 @@ public class CivetEntity extends DiverseCritter {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        // IS_ATTACKING movido a DiverseCritter
         this.entityData.define(IS_CLIMBING, false);
         this.entityData.define(IS_DIGGING, false);
         this.entityData.define(TICKS_CLIMBING, 0);
@@ -124,36 +128,39 @@ public class CivetEntity extends DiverseCritter {
 
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
         this.goalSelector.addGoal(1, new SleepBehaviorGoal(this));
-        this.goalSelector.addGoal(2, new SitWhenOrderedToGoal(this));
-        this.goalSelector.addGoal(3, new BreedGoal(this, 1.0D));
 
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF), false));
+        this.goalSelector.addGoal(2, new BabyCryGoal(this));
+        this.goalSelector.addGoal(2, new FindCryingBabyGoal(this, 1.4D, 24.0D));
+        this.goalSelector.addGoal(3, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(4, new BreedGoal(this, 1.0D));
 
-        this.goalSelector.addGoal(5, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
+        this.goalSelector.addGoal(5, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF), false));
+
+        this.goalSelector.addGoal(6, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
             @Override public boolean canUse() { return isFollowing() && super.canUse(); }
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        this.goalSelector.addGoal(6, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
+        this.goalSelector.addGoal(7, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
 
-        this.goalSelector.addGoal(7, new CivetCleanGoal(this));
+        this.goalSelector.addGoal(8, new CivetCleanGoal(this));
         this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS);
-        this.goalSelector.addGoal(8, this.forFoodGoal);
+        this.goalSelector.addGoal(9, this.forFoodGoal);
 
-        this.goalSelector.addGoal(9, new FindFoodBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(10, new FindWaterBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(11, new CritterDrinkGoal(this));
-        this.goalSelector.addGoal(12, new FindDigBoxGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(10, new FindFoodBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(11, new FindWaterBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(12, new CritterDrinkGoal(this));
+        this.goalSelector.addGoal(13, new FindDigBoxGoal(this, 1.1D, 16));
 
-        this.goalSelector.addGoal(13, new FollowParentGoal(this, 1.15D));
-        this.goalSelector.addGoal(14, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
+        this.goalSelector.addGoal(14, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(15, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
                 boolean canWander = !isTame() || isWandering();
                 return canWander && super.canUse();
             }
         });
-        this.goalSelector.addGoal(15, new LookAtPlayerGoal(this, Player.class, 6.0F));
-        this.goalSelector.addGoal(16, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(16, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(17, new RandomLookAroundGoal(this));
 
         this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
@@ -215,7 +222,7 @@ public class CivetEntity extends DiverseCritter {
             return;
         }
 
-        if (idleBase && current == IdleVariant.NONE && idleVariantCooldown == 0) {
+        if (idleBase && current == IdleVariant.NONE && idleVariantCooldown == 0 && !this.isNewborn()) {
             if (this.random.nextFloat() < 0.01f) {
                 startServerIdleVariant(pickVariant());
             }
@@ -261,6 +268,21 @@ public class CivetEntity extends DiverseCritter {
         if (!this.level().isClientSide) {
             this.setClimbing(this.horizontalCollision && (this.isClimbableX || this.isClimbableZ));
             serverHandleIdleVariant();
+
+            if (this.isNewborn() && this.getHunger() < 3000) {
+                if (!this.isCrying()) {
+                    this.setCrying(true);
+                    this.playSound(SoundEvents.FOX_SCREECH, 0.5F, 2.0F);
+                }
+
+                if (this.tickCount % 80 == 0) {
+                    this.playSound(SoundEvents.FOX_SCREECH, 0.5F, 2.0F);
+                }
+            } else {
+                if (this.isCrying()) {
+                    this.setCrying(false);
+                }
+            }
         }
 
         if (IsDrinking() && getDrinkPos() != null) {
@@ -281,9 +303,9 @@ public class CivetEntity extends DiverseCritter {
 
         if (this.level().isClientSide) {
             setupAnimationStatesClient();
+            handleCryingAnimationClient();
         }
     }
-
     @Override
     public void aiStep() {
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
@@ -571,8 +593,8 @@ public class CivetEntity extends DiverseCritter {
     @Override public int maxHygiene() { return 4000; }
 
     // Sleep
-    @Override public int getPreparingSleepDuration() {return 25;}
-    @Override public int getAwakeningDuration() {return 24;}
+    @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 25;}
+    @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
     @Override protected boolean getDefaultDiurnal() { return true; }
 
     public boolean isClimbing() { return this.entityData.get(IS_CLIMBING); }
@@ -616,5 +638,42 @@ public class CivetEntity extends DiverseCritter {
 
     public boolean isIdleLocked() {
         return getIdleVariant() != IdleVariant.NONE;
+    }
+
+    private void handleCryingAnimationClient() {
+        boolean isCrying = this.isCrying();
+
+        if (isCrying) {
+            this.stoppingCryState.stop();
+            this.stopCryTimer = 0;
+            this.wasCryingClient = true;
+
+            if (this.cryTimer < 10) {
+                this.preparingCryState.startIfStopped(this.tickCount);
+                this.cryingState.stop();
+            } else {
+                this.preparingCryState.stop();
+                this.cryingState.startIfStopped(this.tickCount);
+            }
+            this.cryTimer++;
+
+        } else {
+            this.preparingCryState.stop();
+            this.cryingState.stop();
+            this.cryTimer = 0;
+
+            if (this.wasCryingClient) {
+                if (this.stopCryTimer < 10) {
+                    this.stoppingCryState.startIfStopped(this.tickCount);
+                } else {
+                    this.stoppingCryState.stop();
+                    this.wasCryingClient = false;
+                }
+                this.stopCryTimer++;
+            } else {
+                this.stoppingCryState.stop();
+                this.stopCryTimer = 0;
+            }
+        }
     }
 }

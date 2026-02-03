@@ -9,4 +9,5 @@ public class ModelLayers {
     public static final ModelLayerLocation LION_CUB_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "lion_cub"), "main");
 
     public static final ModelLayerLocation CIVET_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "civet"), "main");
+    public static final ModelLayerLocation CIVET_BABY_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "baby_civet"), "main");
 }
