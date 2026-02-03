@@ -62,7 +62,6 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
         float idleWeight = 1.0F - Math.min(1.0F, limbSwingAmount * 4.0F);
         float walkWeight = 1.0F - idleWeight;
 
-        // 1. Aplicar IDLE (mezclado)
         if (idleWeight > 0) {
             this.animateWithWeight(entity.idleAnimationState, CivetBabyAnims.idle, ageInTicks, 1.0F, idleWeight);
         }

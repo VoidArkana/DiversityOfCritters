@@ -118,7 +118,7 @@ public class CivetEntity extends DiverseCritter {
     }
 
     protected PathNavigation createNavigation(Level pLevel) {
-        return new WallClimberNavigation(this, pLevel);
+        return new CivetNavigation(this, pLevel);
     }
 
     // --- GOALS ---
