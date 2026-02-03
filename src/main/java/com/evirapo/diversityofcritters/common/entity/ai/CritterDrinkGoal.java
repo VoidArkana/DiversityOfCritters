@@ -22,6 +22,9 @@ public class CritterDrinkGoal extends Goal {
     private int drinkTime = 0;
 
     private static final float DRINK_CHANCE = 0.3F;
+    // CAMBIO: Aumentamos el rango de interacción (3.0D = 1.73 bloques de distancia)
+    // Esto evita que se quede atascado intentando entrar al bloque de agua.
+    private static final double MAX_DRINK_DIST_SQ = 3.0D;
 
     private final Direction[] HORIZONTALS = new Direction[]{
             Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
@@ -34,24 +37,16 @@ public class CritterDrinkGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (critter.level().isClientSide()) {
-            return false;
-        }
-
-        if (critter.getThirst() >= critter.maxThirst()) {
-            return false;
-        }
-
-        if (critter.getRandom().nextFloat() >= DRINK_CHANCE) {
-            return false;
-        }
+        if (critter.isNewborn()) return false;
+        if (critter.level().isClientSide()) return false;
+        if (critter.getThirst() >= critter.maxThirst()) return false;
+        if (critter.getRandom().nextFloat() >= DRINK_CHANCE) return false;
 
         waterPos = generateTarget();
         if (waterPos != null) {
             targetPos = getLandPos(waterPos);
             return targetPos != null;
         }
-
         return false;
     }
 
@@ -70,12 +65,14 @@ public class CritterDrinkGoal extends Goal {
         if (targetPos != null && waterPos != null) {
             double dist = this.critter.distanceToSqr(Vec3.atCenterOf(waterPos));
 
-            if (dist > 2 && this.critter.IsDrinking()) {
+            // Si se aleja mucho, cancelar
+            if (dist > (MAX_DRINK_DIST_SQ + 2.0D) && this.critter.IsDrinking()) {
                 this.critter.setIsDrinking(false);
                 this.critter.setDrinkPos(null);
             }
 
-            if (dist <= 1.0F) {
+            // CAMBIO: Usamos la nueva constante MAX_DRINK_DIST_SQ en lugar de 1.0F
+            if (dist <= MAX_DRINK_DIST_SQ) {
                 double d0 = waterPos.getX() + 0.5D - this.critter.getX();
                 double d2 = waterPos.getZ() + 0.5D - this.critter.getZ();
                 float yaw = (float)(Mth.atan2(d2, d0) * (double)Mth.RAD_TO_DEG) - 90.0F;
@@ -92,7 +89,7 @@ public class CritterDrinkGoal extends Goal {
 
                 if (drinkTime % 10 == 0) {
                     CritterDietConfig diet = critter.getDietConfig();
-                    int restorePerSip = diet.thirstPerWaterBowl; // en tu civeta: 99
+                    int restorePerSip = diet.thirstPerWaterBowl;
 
                     int prevThirst = critter.getThirst();
                     this.critter.setThirst(
@@ -107,9 +104,10 @@ public class CritterDrinkGoal extends Goal {
                     );
                 }
 
+                // Mirar al agua
                 this.critter.getLookControl().setLookAt(
                         (double)this.waterPos.getX() + 0.5D,
-                        (double)(this.waterPos.getY() - 1.5),
+                        (double)(this.waterPos.getY()), // Ajuste visual ligero
                         (double)this.waterPos.getZ() + 0.5D,
                         10.0F,
                         (float)this.critter.getMaxHeadXRot()
@@ -119,18 +117,19 @@ public class CritterDrinkGoal extends Goal {
                     this.stop();
                 }
             } else {
+                // Si aún no llega, moverse hacia el TARGET (tierra firme), no hacia el agua directamente
+                // para evitar caerse dentro si es profundo.
                 this.critter.getNavigation().moveTo(
-                        waterPos.getX(), waterPos.getY(), waterPos.getZ(), 1.2D
+                        targetPos.getX() + 0.5D, targetPos.getY(), targetPos.getZ() + 0.5D, 1.2D
                 );
             }
         }
     }
 
+
     @Override
     public boolean canContinueToUse() {
-        if (critter.getThirst() >= critter.maxThirst()) {
-            return false;
-        }
+        if (critter.getThirst() >= critter.maxThirst()) {return false;}
         return targetPos != null && !this.critter.isInWater();
     }
 

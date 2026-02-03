@@ -152,24 +152,29 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         pCompound.putInt("SleepState", this.getSleepState().getId());
         pCompound.putBoolean("Diurnal", this.isDiurnal());
         pCompound.putBoolean("Wandering", this.isWandering());
+        pCompound.putInt("DiverseAge", this.getAge());
     }
+
+    private Integer loadedNbtAge = null;
 
     @Override
     public void readAdditionalSaveData(CompoundTag pCompound) {
         super.readAdditionalSaveData(pCompound);
-
+        if (pCompound.contains("DiverseAge")) {
+            this.loadedNbtAge = pCompound.getInt("DiverseAge");
+            if (this.loadedNbtAge != null) {
+                this.setAge(this.loadedNbtAge);
+            }
+        }
+        this.updateJuvenileState(this.getAge());
         if (pCompound.contains("IsMale")) this.setIsMale(pCompound.getBoolean("IsMale"));
-
         if (pCompound.contains("Hunger")) this.setHunger(pCompound.getInt("Hunger"));
         if (pCompound.contains("Thirst")) this.setThirst(pCompound.getInt("Thirst"));
         if (pCompound.contains("Enrichment")) this.setEnrichment(pCompound.getInt("Enrichment"));
-
         if (pCompound.contains("Hygiene")) {
             this.setHygiene(pCompound.getInt("Hygiene"));
         }
-
         this.setCleaning(pCompound.getBoolean("Cleaning"));
-
         if (pCompound.contains("SleepState")) {
             this.setSleepState(SleepState.byId(pCompound.getInt("SleepState")));
         }
@@ -244,19 +249,19 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         else this.entityData.set(DATA_FLAGS_ID, (byte)(this.entityData.get(DATA_FLAGS_ID) & ~pFlagId));
     }
 
+    private Integer fixAgeOnFirstTick = null;
+
     // --- MAIN TICK ---
     @Override
     public void tick() {
+        if (!this.level().isClientSide && this.fixAgeOnFirstTick != null) {
+            this.setAge(this.fixAgeOnFirstTick);
+            this.updateJuvenileState(this.fixAgeOnFirstTick);
+            this.fixAgeOnFirstTick = null;
+        }
         super.tick();
 
         if (!this.level().isClientSide()) {
-            int currentAge = this.getAge();
-
-            boolean isJuvenileServer = currentAge < 0 && currentAge >= JUVENILE_AGE_THRESHOLD;
-
-            if (this.entityData.get(IS_JUVENILE) != isJuvenileServer) {
-                this.entityData.set(IS_JUVENILE, isJuvenileServer);
-            }
 
             if (this.getHunger() > 0) {
                 double lossPerTick = getHungerLossPerSecond() / 20.0;
@@ -437,10 +442,24 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty,
                                         MobSpawnType reason, @Nullable SpawnGroupData spawnData,
                                         @Nullable CompoundTag dataTag) {
+
         SpawnGroupData res = super.finalizeSpawn(level, difficulty, reason, spawnData, dataTag);
-        if (dataTag == null || !dataTag.contains("IsMale")) {
-            this.setIsMale(this.random.nextBoolean());
+
+        if (reason != MobSpawnType.EVENT) {
+            if (dataTag == null || !dataTag.contains("IsMale")) {
+                this.setIsMale(this.random.nextBoolean());
+            }
         }
+
+
+        if (reason == MobSpawnType.EVENT && this.loadedNbtAge != null) {
+
+            if (this.getAge() > this.loadedNbtAge) {
+                this.setAge(this.loadedNbtAge);
+                this.updateJuvenileState(this.loadedNbtAge);
+            }
+        }
+
         return res;
     }
 
@@ -513,5 +532,36 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     @Override
     public void setBaby(boolean pBaby) {
         this.setAge(pBaby ? -TOTAL_GROWTH_TIME : 0);
+    }
+
+
+    @Override
+    public void setAge(int pAge) {
+        if (pAge == -24000) {
+            int currentAge = this.getAge();
+            if (currentAge < -40000) {
+                return;
+            }
+        }
+
+        super.setAge(pAge);
+        this.updateJuvenileState(pAge);
+    }
+
+    private void updateJuvenileState(int age) {
+        boolean isJuvenile = age < 0 && age >= JUVENILE_AGE_THRESHOLD;
+        if (this.entityData.get(IS_JUVENILE) != isJuvenile) {
+            this.entityData.set(IS_JUVENILE, isJuvenile);
+        }
+    }
+
+    @Override
+    protected float getJumpPower() {
+        return this.isNewborn() ? 0.0F : super.getJumpPower();
+    }
+
+    @Override
+    public boolean canPickUpLoot() {
+        return !this.isNewborn();
     }
 }

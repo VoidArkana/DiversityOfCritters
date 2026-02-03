@@ -25,7 +25,7 @@ public class DOCEntities {
     public static final RegistryObject<EntityType<CivetEntity>> CIVET =
             ENTITY_TYPES.register("civet",
                     () -> EntityType.Builder.of(CivetEntity::new, MobCategory.CREATURE)
-                            .sized(0.45f, 0.4f)
+                            .sized(0.55f, 0.4f)
                             .build(new ResourceLocation(DiversityOfCritters.MODID, "civet").toString()));
 
     public static void register(IEventBus eventBus) {

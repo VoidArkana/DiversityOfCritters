@@ -3,7 +3,6 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.util.BowlFeedingHelper;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -21,7 +20,7 @@ public class FindWaterBowlGoal extends Goal {
     private int drinkTimer = 0;
     private static final int DRINK_INTERVAL = 40;
 
-    private static final double MAX_DRINK_DIST_SQ = 1.0D;
+    private static final double MAX_DRINK_DIST_SQ = 2.8D;
 
     public FindWaterBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -32,20 +31,12 @@ public class FindWaterBowlGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (critter.isNewborn()) return false;
         if (critter.level().isClientSide()) return false;
-
         if (!critter.isThirsty()) return false;
 
         bowlPos = findNearestWaterBowl();
-        if (bowlPos != null) {
-            if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                System.out.println("[WATER-BOWL-GOAL] canUse=TRUE pos=" + critter.blockPosition()
-                        + " thirst=" + critter.getThirst()
-                        + " bowl=" + bowlPos.toShortString());
-            }
-            return true;
-        }
-        return false;
+        return bowlPos != null;
     }
 
     @Override
@@ -69,8 +60,6 @@ public class FindWaterBowlGoal extends Goal {
             Vec3 center = Vec3.atCenterOf(bowlPos);
             critter.getNavigation().moveTo(center.x, center.y, center.z, speed);
         }
-
-        critter.debugGoalMessage("FindWaterBowlGoal", "START");
     }
 
     @Override
@@ -80,7 +69,6 @@ public class FindWaterBowlGoal extends Goal {
         critter.setDrinkPos(null);
         bowlPos = null;
         critter.getNavigation().stop();
-        critter.debugGoalMessage("FindWaterBowlGoal", "STOP");
     }
 
     @Override
@@ -99,38 +87,21 @@ public class FindWaterBowlGoal extends Goal {
             return;
         }
 
-
         critter.setIsDrinking(true);
         critter.setDrinkPos(bowlPos);
-
         critter.getNavigation().stop();
+
         Vec3 dm = critter.getDeltaMovement();
         critter.setDeltaMovement(0, dm.y, 0);
 
         critter.getLookControl().setLookAt(
-                bowlCenter.x,
-                bowlCenter.y + 0.1D,
-                bowlCenter.z
+                bowlCenter.x, bowlCenter.y + 0.1D, bowlCenter.z
         );
 
         drinkTimer++;
         if (drinkTimer % DRINK_INTERVAL == 0) {
-            if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                System.out.println("[WATER-BOWL-GOAL] Intentando beber en " + bowlPos +
-                        " thirst=" + critter.getThirst());
-            }
-
             boolean drank = BowlFeedingHelper.consumeWaterFor(critter, (Level) critter.level(), bowlPos);
-
-            if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                System.out.println("[WATER-BOWL-GOAL] DRANK=" + drank +
-                        " newThirst=" + critter.getThirst());
-            }
-
             if (!drank || critter.getThirst() >= critter.maxThirst()) {
-                if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                    System.out.println("[WATER-BOWL-GOAL] Fin de bebida (sin agua o lleno).");
-                }
                 this.stop();
             }
         }
@@ -140,27 +111,20 @@ public class FindWaterBowlGoal extends Goal {
     private BlockPos findNearestWaterBowl() {
         Level level = (Level) critter.level();
         BlockPos origin = critter.blockPosition();
-        RandomSource random = critter.getRandom();
 
         BlockPos bestPos = null;
         double bestDistSq = Double.MAX_VALUE;
 
         int r = this.searchRadius;
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -r; dz <= r; dz++) {
-                    BlockPos pos = origin.offset(dx, dy, dz);
-                    if (!BowlFeedingHelper.hasWaterFor(level, pos)) continue;
-
-                    double distSq = origin.distSqr(pos);
-                    if (distSq < bestDistSq) {
-                        bestDistSq = distSq;
-                        bestPos = pos;
-                    }
+        for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-r, -2, -r), origin.offset(r, 2, r))) {
+            if (BowlFeedingHelper.hasWaterFor(level, pos)) {
+                double distSq = origin.distSqr(pos);
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    bestPos = pos.immutable();
                 }
             }
         }
-
         return bestPos;
     }
 }

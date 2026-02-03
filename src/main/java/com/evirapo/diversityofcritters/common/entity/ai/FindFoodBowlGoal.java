@@ -21,7 +21,7 @@ public class FindFoodBowlGoal extends Goal {
     private int eatTimer = 0;
     private static final int EAT_INTERVAL = 40;
 
-    private static final double MAX_EAT_DIST_SQ = 1.0D;
+    private static final double MAX_EAT_DIST_SQ = 2.8D;
 
     public FindFoodBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -32,20 +32,12 @@ public class FindFoodBowlGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (critter.isNewborn()) return false;
         if (critter.level().isClientSide()) return false;
-
         if (!critter.isHungry()) return false;
 
         bowlPos = findNearestFoodBowl();
-        if (bowlPos != null) {
-            if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                System.out.println("[BOWL-GOAL] canUse=TRUE pos=" + critter.blockPosition()
-                        + " hunger=" + critter.getHunger()
-                        + " bowl=" + bowlPos.toShortString());
-            }
-            return true;
-        }
-        return false;
+        return bowlPos != null;
     }
 
     @Override
@@ -63,13 +55,10 @@ public class FindFoodBowlGoal extends Goal {
     public void start() {
         eatTimer = 0;
         critter.setIsDrinking(false);
-
         if (bowlPos != null) {
             Vec3 center = Vec3.atCenterOf(bowlPos);
             critter.getNavigation().moveTo(center.x, center.y, center.z, speed);
         }
-
-        critter.debugGoalMessage("FindFoodBowlGoal", "START");
     }
 
     @Override
@@ -78,7 +67,6 @@ public class FindFoodBowlGoal extends Goal {
         critter.setIsDrinking(false);
         bowlPos = null;
         critter.getNavigation().stop();
-        critter.debugGoalMessage("FindFoodBowlGoal", "STOP");
     }
 
     @Override
@@ -90,7 +78,6 @@ public class FindFoodBowlGoal extends Goal {
 
         if (distSq > MAX_EAT_DIST_SQ) {
             critter.setIsDrinking(false);
-
             if (!critter.getNavigation().isInProgress()) {
                 critter.getNavigation().moveTo(bowlCenter.x, bowlCenter.y, bowlCenter.z, speed);
             }
@@ -98,35 +85,19 @@ public class FindFoodBowlGoal extends Goal {
         }
 
         critter.setIsDrinking(true);
-
         critter.getNavigation().stop();
+
         Vec3 dm = critter.getDeltaMovement();
         critter.setDeltaMovement(0, dm.y, 0);
 
         critter.getLookControl().setLookAt(
-                bowlCenter.x,
-                bowlCenter.y + 0.1D,
-                bowlCenter.z
+                bowlCenter.x, bowlCenter.y + 0.1D, bowlCenter.z
         );
 
         eatTimer++;
         if (eatTimer % EAT_INTERVAL == 0) {
-            if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                System.out.println("[BOWL-GOAL] Intentando comer en " + bowlPos +
-                        " hunger=" + critter.getHunger());
-            }
-
             boolean ate = BowlFeedingHelper.consumeFoodFor(critter, (Level) critter.level(), bowlPos);
-
-            if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                System.out.println("[BOWL-GOAL] ATE=" + ate +
-                        " newHunger=" + critter.getHunger());
-            }
-
             if (!ate || critter.getHunger() >= critter.maxHunger()) {
-                if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                    System.out.println("[BOWL-GOAL] Fin de comida (sin comida o lleno).");
-                }
                 this.stop();
             }
         }
@@ -136,27 +107,20 @@ public class FindFoodBowlGoal extends Goal {
     private BlockPos findNearestFoodBowl() {
         Level level = (Level) critter.level();
         BlockPos origin = critter.blockPosition();
-        RandomSource random = critter.getRandom();
 
         BlockPos bestPos = null;
         double bestDistSq = Double.MAX_VALUE;
 
         int r = this.searchRadius;
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -r; dz <= r; dz++) {
-                    BlockPos pos = origin.offset(dx, dy, dz);
-                    if (!BowlFeedingHelper.hasFoodFor(critter, level, pos)) continue;
-
-                    double distSq = origin.distSqr(pos);
-                    if (distSq < bestDistSq) {
-                        bestDistSq = distSq;
-                        bestPos = pos;
-                    }
+        for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-r, -2, -r), origin.offset(r, 2, r))) {
+            if (BowlFeedingHelper.hasFoodFor(critter, level, pos)) {
+                double distSq = origin.distSqr(pos);
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    bestPos = pos.immutable();
                 }
             }
         }
-
         return bestPos;
     }
 }

@@ -20,6 +20,7 @@ public class LookForFoodItems extends Goal {
 
     @Override
     public boolean canUse() {
+        if (base.isNewborn()) return false;
         if(base.isHungry()) {
             ItemEntity pos = itemPos();
             if (pos != null) {

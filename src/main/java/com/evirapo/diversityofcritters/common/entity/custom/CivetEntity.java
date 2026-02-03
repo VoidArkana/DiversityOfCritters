@@ -269,10 +269,15 @@ public class CivetEntity extends DiverseCritter {
         if (!this.level().isClientSide) {
             this.setClimbing(this.horizontalCollision && (this.isClimbableX || this.isClimbableZ));
 
-            double desiredSpeed = this.isNewborn() ? 0.095D : 0.2D;
+            boolean isNewborn = this.isNewborn();
+            double desiredSpeed = isNewborn ? 0.095D : 0.2D;
+            float desiredStep   = isNewborn ? 0.5F : 1.0F;
 
             if (this.getAttribute(Attributes.MOVEMENT_SPEED).getBaseValue() != desiredSpeed) {
                 this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(desiredSpeed);
+            }
+            if (this.maxUpStep() != desiredStep) {
+                this.setMaxUpStep(desiredStep);
             }
             // --------------------------------------------
 
@@ -319,7 +324,8 @@ public class CivetEntity extends DiverseCritter {
     @Override
     public void aiStep() {
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
-        if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS)) {
+
+        if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS) && !this.isNewborn()) {
             int baseBowl = this.getDietConfig().hungerPerMeatBowl;
             int restore  = baseBowl + baseBowl / 4;
             this.setHunger(Math.min(this.getHunger() + restore, this.maxHunger()));
@@ -333,7 +339,7 @@ public class CivetEntity extends DiverseCritter {
             }
         }
 
-        if (isHungry() && (double)this.random.nextFloat() <= 0.2) triggerFoodSearch();
+        if (isHungry() && !this.isNewborn() && (double)this.random.nextFloat() <= 0.2) triggerFoodSearch();
 
         super.aiStep();
 
@@ -573,6 +579,7 @@ public class CivetEntity extends DiverseCritter {
     }
 
     private void triggerFoodSearch() {
+        if (this.isNewborn()) return;
         if (this.forFoodGoal != null) {
             this.forFoodGoal.trigger();
         } else {
@@ -584,7 +591,9 @@ public class CivetEntity extends DiverseCritter {
     }
 
     @Override
-    public boolean canPickUpLoot() { return true; }
+    public boolean canPickUpLoot() {
+        return !this.isNewborn();
+    }
 
     @Override
     public boolean canAttack(LivingEntity pTarget) {

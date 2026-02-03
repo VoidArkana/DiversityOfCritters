@@ -35,7 +35,7 @@ public class CivetRenderer<T extends CivetEntity> extends MobRenderer<T, Hierarc
             this.shadowRadius = 0.15f;
 
             poseStack.pushPose();
-            poseStack.scale(0.6F, 0.6F, 0.6F);
+            poseStack.scale(0.45F, 0.45F, 0.45F);
 
         } else {
             this.model = this.adultModel;
