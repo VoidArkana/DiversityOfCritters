@@ -419,6 +419,41 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             return InteractionResult.SUCCESS;
         }
 
+        if (this.isOwnedBy(pPlayer) && itemstack.is(DOCItems.TRAINING_STICK.get())) {
+            if (this.isNewborn()) {
+                if (level().isClientSide) pPlayer.displayClientMessage(Component.literal("Too young to follow orders!"), true);
+                return InteractionResult.PASS;
+            }
+
+            if (level().isClientSide) return InteractionResult.CONSUME;
+
+            if (!this.isOrderedToSit() && !this.isWandering()) {
+                this.setWandering(true);
+                this.setOrderedToSit(false);
+                this.setInSittingPose(false);
+                this.messageState("wandering", pPlayer);
+            }
+            else {
+                boolean willSit = !this.isOrderedToSit();
+
+                if (willSit) {
+                    this.setCleaning(false);
+                    this.setAttacking(false);
+                    this.getNavigation().stop();
+                    this.setTarget(null);
+
+                    setModeSit(true);
+                    this.level().playSound(null, this.blockPosition(), SoundEvents.WOOL_PLACE, SoundSource.NEUTRAL, 0.6f, 1.0f);
+                } else {
+                    this.setWandering(false);
+                    this.setOrderedToSit(false);
+                    this.setInSittingPose(false);
+                }
+                this.messageState(willSit ? "sit" : "following", pPlayer);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide);
+        }
+
         if (this.isBaby() && this.isFood(itemstack)) {
             return InteractionResult.PASS;
         }
