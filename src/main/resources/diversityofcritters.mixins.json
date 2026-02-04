@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.evirapo.diversityofcritters.mixin",
+  "plugin": "com.evirapo.diversityofcritters.mixin.DiversityMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "compat.CarryOnDataMixin",
+    "compat.CarryRenderHelperMixin"
+  ],
+  "client": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

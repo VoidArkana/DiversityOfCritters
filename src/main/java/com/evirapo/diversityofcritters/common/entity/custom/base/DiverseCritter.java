@@ -418,6 +418,11 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             this.openGUI(pPlayer);
             return InteractionResult.SUCCESS;
         }
+
+        if (this.isBaby() && this.isFood(itemstack)) {
+            return InteractionResult.PASS;
+        }
+
         return super.mobInteract(pPlayer, pHand);
     }
 
