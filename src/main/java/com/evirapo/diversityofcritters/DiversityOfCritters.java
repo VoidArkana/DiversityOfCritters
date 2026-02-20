@@ -49,7 +49,7 @@ public class DiversityOfCritters {
     private void commonSetup(final FMLCommonSetupEvent event) {
         DOCNetworkHandler.init();
 
-        SpawnPlacements.register(DOCEntities.CIVET.get(), SpawnPlacements.Type.ON_GROUND, Heightmap.Types.MOTION_BLOCKING, CivetEntity::checkCivetSpawnRules);
+        SpawnPlacements.register(DOCEntities.CIVET.get(), SpawnPlacements.Type.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, CivetEntity::checkCivetSpawnRules);
 
     }
 

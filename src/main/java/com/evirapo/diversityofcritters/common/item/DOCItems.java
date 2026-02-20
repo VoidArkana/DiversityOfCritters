@@ -39,10 +39,16 @@ public class DOCItems {
             () -> new BlockItem(DOCBlocks.DIG_BOX.get(), new Item.Properties()));
 
     public static final RegistryObject<Item> BRUSH = ITEM_TYPES.register("brush",
-            () -> new BrushItem(new Item.Properties().stacksTo(1).durability(64))); // Durabilidad 64 usos
+            () -> new BrushItem(new Item.Properties().stacksTo(1).durability(64)));
 
     public static final RegistryObject<Item> GAUZE_BANDAGE = ITEM_TYPES.register("gauze_bandage",
-            () -> new GauzeBandageItem(new Item.Properties().stacksTo(16))); // Stackeable hasta 16
+            () -> new GauzeBandageItem(new Item.Properties().stacksTo(16)));
+
+    public static final RegistryObject<Item> EMPTY_NURSER_BOTTLE = ITEM_TYPES.register("empty_nurser_bottle",
+            () -> new Item(new Item.Properties()));
+
+    public static final RegistryObject<Item> FILLED_NURSER_BOTTLE = ITEM_TYPES.register("filled_nurser_bottle",
+            () -> new Item(new Item.Properties().durability(5)));
 
     public static void register(IEventBus eventBus) {
         ITEM_TYPES.register(eventBus);

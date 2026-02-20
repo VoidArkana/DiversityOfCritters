@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "diversityofcritters:item/filled_nurser_bottle"
+  }
+}

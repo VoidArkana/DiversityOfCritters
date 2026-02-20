@@ -26,5 +26,8 @@ public class DOCNetworkHandler {
 
         CHANNEL.registerMessage(id++, ReleaseCritterMsg.class,
                 ReleaseCritterMsg::encode, ReleaseCritterMsg::decode, ReleaseCritterMsg::handle);
+
+        CHANNEL.registerMessage(id++, ToggleBreedMsg.class,
+                ToggleBreedMsg::encode, ToggleBreedMsg::decode, ToggleBreedMsg::handle);
     }
 }

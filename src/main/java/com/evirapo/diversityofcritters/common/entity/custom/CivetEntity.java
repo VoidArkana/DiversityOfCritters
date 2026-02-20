@@ -30,6 +30,7 @@ import net.minecraft.world.entity.ai.goal.*;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
+import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -133,7 +134,7 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(2, new BabyCryGoal(this));
         this.goalSelector.addGoal(2, new FindCryingBabyGoal(this, 1.4D, 24.0D));
         this.goalSelector.addGoal(3, new SitWhenOrderedToGoal(this));
-        this.goalSelector.addGoal(4, new BreedGoal(this, 1.0D));
+        this.goalSelector.addGoal(4, new NaturalMateGoal(this, 1.0D));
 
         this.goalSelector.addGoal(5, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF), false));
 
@@ -507,11 +508,33 @@ public class CivetEntity extends DiverseCritter {
 
         // 1. DOMESTICACIÓN
         boolean isItemTamingMeat = itemstack.is(DoCTags.Items.MEATS) || itemstack.is(ItemTags.FISHES);
-        if (isItemTamingMeat && !this.isTame()) {
+        boolean isNurserBottle = itemstack.is(DOCItems.FILLED_NURSER_BOTTLE.get());
+
+        // Baby: solo se tamea con biberón lleno
+        // Juvenile/Adult: solo se tamean con carne/pescado
+        boolean canTameWithThis = false;
+        if (!this.isTame()) {
+            if (this.isBaby() && !this.isJuvenile()) {
+                // Newborn: solo biberón
+                canTameWithThis = isNurserBottle;
+            } else {
+                // Juvenile o Adult: solo carne/pescado
+                canTameWithThis = isItemTamingMeat;
+            }
+        }
+
+        if (canTameWithThis) {
             if (this.level().isClientSide()) {
                 return InteractionResult.CONSUME;
             } else {
-                if (!pPlayer.getAbilities().instabuild) itemstack.shrink(1);
+                if (!pPlayer.getAbilities().instabuild) {
+                    if (isNurserBottle) {
+                        // El biberón pierde durabilidad en vez de consumirse
+                        itemstack.hurtAndBreak(1, pPlayer, (p) -> p.broadcastBreakEvent(pHand));
+                    } else {
+                        itemstack.shrink(1);
+                    }
+                }
                 if (this.tamingFeedsLeft <= 0) this.tamingFeedsLeft = 3 + this.random.nextInt(3);
                 this.tamingFeedsLeft--;
                 if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
@@ -593,7 +616,9 @@ public class CivetEntity extends DiverseCritter {
     public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}
 
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
-        return rnd.nextInt(3) != 0;
+        // TODO: restaurar despues de probar:
+        // return Animal.checkAnimalSpawnRules(t, lvl, type, pos, rnd) && rnd.nextInt(3) == 0;
+        return true;
     }
 
     @Nullable
