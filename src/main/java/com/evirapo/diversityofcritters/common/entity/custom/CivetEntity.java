@@ -506,19 +506,14 @@ public class CivetEntity extends DiverseCritter {
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
         ItemStack itemstack = pPlayer.getItemInHand(pHand);
 
-        // 1. DOMESTICACIÓN
         boolean isItemTamingMeat = itemstack.is(DoCTags.Items.MEATS) || itemstack.is(ItemTags.FISHES);
         boolean isNurserBottle = itemstack.is(DOCItems.FILLED_NURSER_BOTTLE.get());
 
-        // Baby: solo se tamea con biberón lleno
-        // Juvenile/Adult: solo se tamean con carne/pescado
         boolean canTameWithThis = false;
         if (!this.isTame()) {
             if (this.isBaby() && !this.isJuvenile()) {
-                // Newborn: solo biberón
                 canTameWithThis = isNurserBottle;
             } else {
-                // Juvenile o Adult: solo carne/pescado
                 canTameWithThis = isItemTamingMeat;
             }
         }
@@ -529,7 +524,6 @@ public class CivetEntity extends DiverseCritter {
             } else {
                 if (!pPlayer.getAbilities().instabuild) {
                     if (isNurserBottle) {
-                        // El biberón pierde durabilidad en vez de consumirse
                         itemstack.hurtAndBreak(1, pPlayer, (p) -> p.broadcastBreakEvent(pHand));
                     } else {
                         itemstack.shrink(1);
@@ -552,14 +546,19 @@ public class CivetEntity extends DiverseCritter {
             }
         }
 
-        // 2. CURACIÓN
-        if (this.isTame()) {
-            if (this.isFood(itemstack) && this.getHealth() < this.getMaxHealth()) {
-                var foodProps = itemstack.isEdible() ? itemstack.getFoodProperties(this) : null;
-                if (foodProps != null) this.heal((float) foodProps.getNutrition());
-                if (!pPlayer.getAbilities().instabuild) itemstack.shrink(1);
-                this.level().broadcastEntityEvent(this, (byte)7);
-                this.gameEvent(GameEvent.EAT, this);
+        // 2. ALIMENTACIÓN (comida de mano del jugador → sube hunger + cura HP)
+        boolean isMeatFood = itemstack.is(DoCTags.Items.MEATS) || itemstack.is(ItemTags.FISHES);
+        if (isMeatFood && !this.isBaby()) {
+            if (this.getHunger() < this.maxHunger() || this.getHealth() < this.getMaxHealth()) {
+                if (!this.level().isClientSide()) {
+                    int restore = this.getDietConfig().hungerPerMeatBowl;
+                    this.setHunger(Math.min(this.getHunger() + restore, this.maxHunger()));
+                    var foodProps = itemstack.isEdible() ? itemstack.getFoodProperties(this) : null;
+                    if (foodProps != null) this.heal((float) foodProps.getNutrition());
+                    if (!pPlayer.getAbilities().instabuild) itemstack.shrink(1);
+                    this.level().broadcastEntityEvent(this, (byte) 7);
+                    this.gameEvent(GameEvent.EAT, this);
+                }
                 return InteractionResult.SUCCESS;
             }
         }
@@ -585,13 +584,21 @@ public class CivetEntity extends DiverseCritter {
     }
 
     @Override
+    public boolean wantsToPickUp(ItemStack pStack) {
+        // Solo recoger carne del suelo - nunca items no-comida
+        return pStack.is(DoCTags.Items.MEATS);
+    }
+
+    @Override
     public boolean canAttack(LivingEntity pTarget) {
         return super.canAttack(pTarget) && ((this.getLastHurtByMob() != null && this.getLastHurtByMob() == pTarget) || this.isHungry());
     }
 
     @Override
     public boolean isFood(ItemStack pStack) {
-        return pStack.is(Items.SWEET_BERRIES);
+        // Retornar false para evitar que vanilla maneje la comida (crecimiento, breeding)
+        // Toda la lógica de alimentación se maneja en mobInteract y aiStep
+        return false;
     }
 
     // --- HELPERS & CONFIG ---
@@ -616,8 +623,6 @@ public class CivetEntity extends DiverseCritter {
     public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}
 
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
-        // TODO: restaurar despues de probar:
-        // return Animal.checkAnimalSpawnRules(t, lvl, type, pos, rnd) && rnd.nextInt(3) == 0;
         return true;
     }
 

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "S  ",
+    "WS ",
+    "  S"
+  ],
+  "key": {
+    "S": { "item": "minecraft:stick" },
+    "F": { "item": "minecraft:wheat" }
+  },
+  "result": {
+    "item": "diversityofcritters:brush",
+    "count": 1
+  }
+}

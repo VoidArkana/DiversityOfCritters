@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IDP",
+    "PPP",
+    "   "
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "P": { "item": "minecraft:paper" }
+  },
+  "result": {
+    "item": "diversityofcritters:zoo_book",
+    "count": 1
+  }
+}

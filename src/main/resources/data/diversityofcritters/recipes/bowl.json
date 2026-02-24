@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "I I",
+    " I ",
+    " L "
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "L": { "item": "minecraft:leather" }
+  },
+  "result": {
+    "item": "diversityofcritters:bowl",
+    "count": 1
+  }
+}

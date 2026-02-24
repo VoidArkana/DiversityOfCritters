@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "L  ",
+    " B ",
+    "  B"
+  ],
+  "key": {
+    "L": { "item": "minecraft:leather" },
+    "B": { "item": "minecraft:copper_ingot" }
+  },
+  "result": {
+    "item": "diversityofcritters:training_stick",
+    "count": 1
+  }
+}

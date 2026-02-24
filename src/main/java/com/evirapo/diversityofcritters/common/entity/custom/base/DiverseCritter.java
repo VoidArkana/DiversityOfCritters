@@ -286,7 +286,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
         if (!this.level().isClientSide()) {
 
-            // [FASE 1] Temporizadores de Reproducción y Gestación
             if (this.breedCooldown > 0) {
                 this.breedCooldown--;
             }
@@ -611,21 +610,17 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         for (Player player : this.level().players()) { if (player.distanceTo(this) < 32.0F) player.displayClientMessage(Component.literal(base), true); }
     }
 
-    //--MATE--
-    // [FASE 1] Aquí dejamos canMate preparado, aunque usaremos nuestra propia IA después.
     @Override
     public boolean canMate(Animal otherAnimal) {
         if (otherAnimal == this || !this.canBreed()) return false;
         if (!(otherAnimal instanceof DiverseCritter otherCritter)) return false;
         if (!otherCritter.canBreed()) return false;
 
-        // No se pueden reproducir si son del mismo género, si alguno está embarazada, o sentado
         if (this.getIsMale() == otherCritter.getIsMale()) return false;
         if (this.isPregnant() || otherCritter.isPregnant()) return false;
         if (this.isOrderedToSit() || otherCritter.isOrderedToSit()) return false;
         if (this.isBaby() || otherCritter.isBaby()) return false;
 
-        // Cooldown en 0 para ambos
         return this.breedCooldown <= 0 && otherCritter.breedCooldown <= 0;
     }
 
