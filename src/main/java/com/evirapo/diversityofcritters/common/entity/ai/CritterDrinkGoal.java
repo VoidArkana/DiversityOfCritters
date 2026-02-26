@@ -22,8 +22,6 @@ public class CritterDrinkGoal extends Goal {
     private int drinkTime = 0;
 
     private static final float DRINK_CHANCE = 0.3F;
-    // CAMBIO: Aumentamos el rango de interacción (3.0D = 1.73 bloques de distancia)
-    // Esto evita que se quede atascado intentando entrar al bloque de agua.
     private static final double MAX_DRINK_DIST_SQ = 3.0D;
 
     private final Direction[] HORIZONTALS = new Direction[]{
@@ -65,13 +63,11 @@ public class CritterDrinkGoal extends Goal {
         if (targetPos != null && waterPos != null) {
             double dist = this.critter.distanceToSqr(Vec3.atCenterOf(waterPos));
 
-            // Si se aleja mucho, cancelar
             if (dist > (MAX_DRINK_DIST_SQ + 2.0D) && this.critter.IsDrinking()) {
                 this.critter.setIsDrinking(false);
                 this.critter.setDrinkPos(null);
             }
 
-            // CAMBIO: Usamos la nueva constante MAX_DRINK_DIST_SQ en lugar de 1.0F
             if (dist <= MAX_DRINK_DIST_SQ) {
                 double d0 = waterPos.getX() + 0.5D - this.critter.getX();
                 double d2 = waterPos.getZ() + 0.5D - this.critter.getZ();
@@ -104,10 +100,9 @@ public class CritterDrinkGoal extends Goal {
                     );
                 }
 
-                // Mirar al agua
                 this.critter.getLookControl().setLookAt(
                         (double)this.waterPos.getX() + 0.5D,
-                        (double)(this.waterPos.getY()), // Ajuste visual ligero
+                        (double)(this.waterPos.getY()),
                         (double)this.waterPos.getZ() + 0.5D,
                         10.0F,
                         (float)this.critter.getMaxHeadXRot()
@@ -117,8 +112,6 @@ public class CritterDrinkGoal extends Goal {
                     this.stop();
                 }
             } else {
-                // Si aún no llega, moverse hacia el TARGET (tierra firme), no hacia el agua directamente
-                // para evitar caerse dentro si es profundo.
                 this.critter.getNavigation().moveTo(
                         targetPos.getX() + 0.5D, targetPos.getY(), targetPos.getZ() + 0.5D, 1.2D
                 );
@@ -136,14 +129,16 @@ public class CritterDrinkGoal extends Goal {
     // --------- Búsqueda de agua natural ---------
 
     public BlockPos generateTarget() {
-        BlockPos blockpos = null;
+        BlockPos closestPos = null;
+        double closestDistSq = Double.MAX_VALUE;
         final RandomSource random = this.critter.getRandom();
-        int range = 32;
 
-        for (int i = 0; i < 15; i++) {
+        int range = 24;
+
+        for (int i = 0; i < 30; i++) {
             BlockPos blockpos1 = this.critter.blockPosition().offset(
                     random.nextInt(range) - range / 2,
-                    3,
+                    random.nextInt(8) - 4,
                     random.nextInt(range) - range / 2
             );
 
@@ -153,10 +148,15 @@ public class CritterDrinkGoal extends Goal {
             }
 
             if (isConnectedToLand(blockpos1)) {
-                blockpos = blockpos1;
+                double distSq = this.critter.blockPosition().distSqr(blockpos1);
+
+                if (distSq < closestDistSq) {
+                    closestDistSq = distSq;
+                    closestPos = blockpos1;
+                }
             }
         }
-        return blockpos;
+        return closestPos;
     }
 
     public boolean isConnectedToLand(BlockPos pos) {
@@ -184,4 +184,6 @@ public class CritterDrinkGoal extends Goal {
         }
         return null;
     }
+
+
 }

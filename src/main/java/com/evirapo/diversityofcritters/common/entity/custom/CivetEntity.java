@@ -15,6 +15,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.ItemTags;
@@ -690,5 +691,43 @@ public class CivetEntity extends DiverseCritter {
                 this.stopCryTimer = 0;
             }
         }
+    }
+
+    @Nullable
+    @Override
+    protected SoundEvent getAmbientSound() {
+        if (this.isSleeping()) {
+            return SoundEvents.CAT_PURR;
+        }
+        if (this.isTame()) {
+            return SoundEvents.CAT_AMBIENT;
+        }
+        return SoundEvents.FOX_AMBIENT;
+    }
+
+    @Nullable
+    @Override
+    protected SoundEvent getHurtSound(DamageSource pDamageSource) {
+        return SoundEvents.FOX_HURT;
+    }
+
+    @Nullable
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.FOX_DEATH;
+    }
+
+    @Override
+    public SoundEvent getEatingSound(ItemStack pStack) {
+        return SoundEvents.CAT_EAT;
+    }
+
+    @Override
+    public boolean doHurtTarget(Entity pEntity) {
+        boolean flag = super.doHurtTarget(pEntity);
+        if (flag) {
+            this.playSound(SoundEvents.FOX_BITE, 1.0F, 1.0F);
+        }
+        return flag;
     }
 }
