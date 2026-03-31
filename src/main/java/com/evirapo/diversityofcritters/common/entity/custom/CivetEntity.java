@@ -71,9 +71,13 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState idleLayEndingState   = new AnimationState();
     public final AnimationState climbingUpState    = new AnimationState();
     public final AnimationState attackAnimationState = new AnimationState();
-    public final AnimationState drinkingAnimationState = new AnimationState();
+    public final AnimationState drinkStartingState = new AnimationState();
+    public final AnimationState drinkIdleState     = new AnimationState();
+    public final AnimationState drinkEndingState   = new AnimationState();
     public final AnimationState diggingAnimationState = new AnimationState();
-    public final AnimationState cleanAnimationState = new AnimationState();
+    public final AnimationState cleanStartingState = new AnimationState();
+    public final AnimationState cleanIdleState     = new AnimationState();
+    public final AnimationState cleanEndingState   = new AnimationState();
     public final AnimationState preparingCryState = new AnimationState();
     public final AnimationState cryingState = new AnimationState();
     public final AnimationState stoppingCryState = new AnimationState();
@@ -107,6 +111,13 @@ public class CivetEntity extends DiverseCritter {
 
     private boolean prevScratchingClient = false;
     private int clientScratchTick = 0;
+
+    private boolean prevCleaningClient = false;
+    private int clientCleanTick = 0;
+
+    private boolean prevDrinkingClient = false;
+    private int clientDrinkTick = 0;
+    private int clientDrinkEndingTick = 0;
 
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
@@ -199,7 +210,6 @@ public class CivetEntity extends DiverseCritter {
     public void setIdleVariant(IdleVariant v){ this.entityData.set(IDLE_VARIANT, toByte(v)); }
     public IdleVariant getIdleVariant(){ return fromByte(this.entityData.get(IDLE_VARIANT)); }
 
-    // --- MAIN TICK ---
     @Override
     public void tick() {
         super.tick();
@@ -253,7 +263,6 @@ public class CivetEntity extends DiverseCritter {
         }
 
         if (this.level().isClientSide) {
-            // --- CONTADOR DE IDLE ---
             IdleVariant currentVariant = getIdleVariant();
 
             if (currentVariant != prevClientVariant) {
@@ -273,7 +282,35 @@ public class CivetEntity extends DiverseCritter {
             if (currentScratch) {
                 this.clientScratchTick++;
             }
-            // ------------------------------------
+
+            boolean currentCleaning = isCleaning();
+            if (currentCleaning != prevCleaningClient) {
+                this.clientCleanTick = 0;
+                this.prevCleaningClient = currentCleaning;
+            }
+            if (currentCleaning) {
+                this.clientCleanTick++;
+            }
+
+            boolean currentDrinking = IsDrinking();
+
+            if (currentDrinking && !prevDrinkingClient) {
+                this.clientDrinkTick = 0;
+                this.clientDrinkEndingTick = 0;
+            } else if (!currentDrinking && prevDrinkingClient) {
+                this.clientDrinkEndingTick = 1;
+                this.clientDrinkTick = 0;
+            }
+
+            if (currentDrinking) {
+                this.clientDrinkTick++;
+            } else if (this.clientDrinkEndingTick > 0) {
+                this.clientDrinkEndingTick++;
+                if (this.clientDrinkEndingTick > 6) {
+                    this.clientDrinkEndingTick = 0;
+                }
+            }
+            this.prevDrinkingClient = currentDrinking;
 
             setupAnimationStatesClient();
             handleCryingAnimationClient();
@@ -404,16 +441,21 @@ public class CivetEntity extends DiverseCritter {
             this.idleLayState.stop();
             this.idleLayEndingState.stop();
 
-            // Detener también el rascado si se le ordena sentarse
             this.scratchStartingState.stop();
             this.scratchIdleState.stop();
             this.scratchEndingState.stop();
 
-            this.cleanAnimationState.stop();
+            this.cleanStartingState.stop();
+            this.cleanIdleState.stop();
+            this.cleanEndingState.stop();
+
+            this.drinkStartingState.stop();
+            this.drinkIdleState.stop();
+            this.drinkEndingState.stop();
+
             this.diggingAnimationState.stop();
             this.climbingUpState.stop();
             this.attackAnimationState.stop();
-            this.drinkingAnimationState.stop();
             return;
         }
 
@@ -421,7 +463,6 @@ public class CivetEntity extends DiverseCritter {
         boolean swimming     = this.isInWaterOrBubble();
         boolean climbing     = this.isClimbing();
         boolean doingAttack  = this.isAttacking();
-        boolean drinking     = this.IsDrinking();
         boolean hasTarget    = this.getTarget() != null;
 
         IdleVariant v = getIdleVariant();
@@ -453,13 +494,32 @@ public class CivetEntity extends DiverseCritter {
 
         boolean isScratchPlaying = scratching && scratchActive <= scratchTotal;
 
+        boolean cleaning = isCleaning();
+        int cleanActive = this.clientCleanTick;
+        int cleanStart = 10;
+        int cleanLoop  = 60;
+        int cleanEnd   = 10;
+        int cleanTotal = cleanStart + cleanLoop + cleanEnd;
+
+        boolean isCleanPlaying = cleaning && cleanActive <= cleanTotal;
+
+        // --- CÁLCULO MÁQUINA DE ESTADOS: DRINKING DINÁMICO ---
+        boolean drinking = IsDrinking();
+        boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
+        boolean isDrinkIdle     = drinking && this.clientDrinkTick > 5;
+        boolean isDrinkEnding   = !drinking && this.clientDrinkEndingTick > 0;
+
+        boolean isDrinkPlaying  = isDrinkStarting || isDrinkIdle || isDrinkEnding;
+
+        // Se usa isDrinkPlaying en lugar de drinking para que softIdle cubra la fase de salida
         boolean softIdle = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
-                && !doingAttack && !drinking && !hasTarget
+                && !doingAttack && !hasTarget
                 && !this.isDigging()
                 && !isVariantPlaying
-                && !this.isCleaning()
-                && !isScratchPlaying;
+                && !isScratchPlaying
+                && !isCleanPlaying
+                && !isDrinkPlaying;
 
         this.idleAnimationState.animateWhen(softIdle, this.tickCount);
 
@@ -497,9 +557,27 @@ public class CivetEntity extends DiverseCritter {
             this.scratchEndingState.stop();
         }
 
-        this.cleanAnimationState.animateWhen(this.isCleaning(), this.tickCount);
+        if (isCleanPlaying) {
+            this.cleanStartingState.animateWhen(cleanActive <= cleanStart, this.tickCount);
+            this.cleanIdleState.animateWhen(cleanActive > cleanStart && cleanActive <= cleanStart + cleanLoop, this.tickCount);
+            this.cleanEndingState.animateWhen(cleanActive > cleanStart + cleanLoop, this.tickCount);
+        } else {
+            this.cleanStartingState.stop();
+            this.cleanIdleState.stop();
+            this.cleanEndingState.stop();
+        }
+
+        if (isDrinkPlaying) {
+            this.drinkStartingState.animateWhen(isDrinkStarting, this.tickCount);
+            this.drinkIdleState.animateWhen(isDrinkIdle, this.tickCount);
+            this.drinkEndingState.animateWhen(isDrinkEnding, this.tickCount);
+        } else {
+            this.drinkStartingState.stop();
+            this.drinkIdleState.stop();
+            this.drinkEndingState.stop();
+        }
+
         this.climbingUpState.animateWhen(this.isClimbingUp(), this.tickCount);
-        this.drinkingAnimationState.animateWhen(this.isAlive() && this.IsDrinking(), this.tickCount);
         this.diggingAnimationState.animateWhen(this.isDigging(), this.tickCount);
 
         if (this.isAttacking() && this.attackAnimationTimeout <= 0) {

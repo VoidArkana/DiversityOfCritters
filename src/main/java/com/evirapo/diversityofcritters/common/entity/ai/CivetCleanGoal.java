@@ -18,6 +18,10 @@ public class CivetCleanGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (entity.isNewborn()) {
+            return false;
+        }
+
         if (entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() ||
                 entity.isAttacking() || entity.isOrderedToSit() || entity.isIdleLocked()) {
             return false;
@@ -33,7 +37,7 @@ public class CivetCleanGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if (entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() ||
+        if (entity.isNewborn() || entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() ||
                 entity.isAttacking() || entity.isOrderedToSit()) {
             return false;
         }

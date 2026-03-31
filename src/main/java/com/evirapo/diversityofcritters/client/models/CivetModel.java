@@ -185,13 +185,17 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			}
 		}
 
-		this.animate(entity.cleanAnimationState, CivetAnims.GROOMING, ageInTicks, 1.0F);
-		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
+		this.animate(entity.cleanStartingState, CivetAnims.GROOMING_STARTING, ageInTicks, 1.0F);
+		this.animate(entity.cleanIdleState,     CivetAnims.GROOMING_IDLE,     ageInTicks, 1.0F);
+		this.animate(entity.cleanEndingState,   CivetAnims.GROOMING_ENDING,   ageInTicks, 1.0F);
 		this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
 		this.animate(entity.diggingAnimationState,   CivetAnims.DIGGING, ageInTicks, 1.0F);
 		this.animate(entity.scratchStartingState, CivetAnims.SCRATCHING_STARTING, ageInTicks, 1.0F);
 		this.animate(entity.scratchIdleState,     CivetAnims.SCRATCHING_IDLE,     ageInTicks, 1.0F);
 		this.animate(entity.scratchEndingState,   CivetAnims.SCRATCHING_ENDING,   ageInTicks, 1.0F);
+		this.animate(entity.drinkStartingState, CivetAnims.DRINK_STARTING, ageInTicks, 1.0F);
+		this.animate(entity.drinkIdleState,     CivetAnims.DRINK_IDLE,     ageInTicks, 1.0F);
+		this.animate(entity.drinkEndingState,   CivetAnims.DRINK_ENDING,   ageInTicks, 1.0F);
 
 		if (this.young){
 			this.applyStatic(CivetAnims.BABY);
