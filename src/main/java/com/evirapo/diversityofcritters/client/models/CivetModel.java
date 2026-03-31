@@ -140,7 +140,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
 			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
 
-			this.animate(entity.sitState, CivetAnims.SIT, ageInTicks, 1.0F);
+			this.animate(entity.sitState, CivetAnims.SIT_IDLE, ageInTicks, 1.0F);
 
 			if (this.young){
 				this.applyStatic(CivetAnims.BABY);
@@ -174,8 +174,14 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 				this.animate(entity.idleStandUpState,    CivetAnims.STAND_UP,   ageInTicks, 1.0F);
 				this.animate(entity.idleSniffLeftState,  CivetAnims.SNIFF_LEFT, ageInTicks, 1.0F);
 				this.animate(entity.idleSniffRightState, CivetAnims.SNIFF_RIGHT,ageInTicks, 1.0F);
-				this.animate(entity.idleSitState,        CivetAnims.SIT,        ageInTicks, 1.0F);
-				this.animate(entity.idleLayState,        CivetAnims.LAY,        ageInTicks, 1.0F);
+
+				this.animate(entity.idleSitStartingState, CivetAnims.SIT_STARTING, ageInTicks, 1.0F);
+				this.animate(entity.idleSitState,         CivetAnims.SIT_IDLE,     ageInTicks, 1.0F);
+				this.animate(entity.idleSitEndingState,   CivetAnims.SIT_ENDING,   ageInTicks, 1.0F);
+
+				this.animate(entity.idleLayStartingState, CivetAnims.LAY_STARTING, ageInTicks, 1.0F);
+				this.animate(entity.idleLayState,         CivetAnims.LAY_IDLE,     ageInTicks, 1.0F);
+				this.animate(entity.idleLayEndingState,   CivetAnims.LAY_ENDING,   ageInTicks, 1.0F);
 			}
 		}
 
