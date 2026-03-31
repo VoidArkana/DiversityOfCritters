@@ -40,6 +40,7 @@ public class DOCEntitiesCreativeTab {
                         output.accept(DOCItems.GAUZE_BANDAGE.get());
                         output.accept(DOCItems.EMPTY_NURSER_BOTTLE.get());
                         output.accept(DOCItems.FILLED_NURSER_BOTTLE.get());
+                        output.accept(DOCItems.WORM.get());
 
                     })
                     .build());

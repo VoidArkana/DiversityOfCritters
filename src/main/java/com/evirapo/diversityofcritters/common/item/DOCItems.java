@@ -5,6 +5,7 @@ import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.item.custom.BrushItem;
 import com.evirapo.diversityofcritters.common.item.custom.GauzeBandageItem;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeSpawnEggItem;
@@ -49,6 +50,11 @@ public class DOCItems {
 
     public static final RegistryObject<Item> FILLED_NURSER_BOTTLE = ITEM_TYPES.register("filled_nurser_bottle",
             () -> new Item(new Item.Properties().durability(5)));
+
+    public static final RegistryObject<Item> WORM = ITEM_TYPES.register("worm",
+            () -> new Item(new Item.Properties().food(new FoodProperties.Builder()
+                    .nutrition(3)
+                    .saturationMod(0.1f).build())));
 
     public static void register(IEventBus eventBus) {
         ITEM_TYPES.register(eventBus);

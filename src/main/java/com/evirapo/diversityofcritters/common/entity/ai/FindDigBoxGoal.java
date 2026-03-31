@@ -25,8 +25,11 @@ public class FindDigBoxGoal extends Goal {
 
     private BlockPos boxPos;
     private int digTimer = 0;
-    private static final int DIG_DURATION = 80; // 4 segundos
+    private static final int DIG_DURATION = 80;
     private static final double MAX_DIST_SQ = 2.0D;
+
+    private boolean isFinishing = false;
+    private int finishingTimer = 0;
 
     public FindDigBoxGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -41,22 +44,16 @@ public class FindDigBoxGoal extends Goal {
         if (!critter.isEnrichmentNeeded()) return false;
 
         boxPos = findNearestValidDigBox();
-
-        if (boxPos != null) {
-            if (DiverseCritter.DEBUG_BOWL_GOALS) {
-                System.out.println("[DIG-BOX-GOAL] canUse=TRUE pos=" + critter.blockPosition()
-                        + " enrichment=" + critter.getEnrichment()
-                        + " box=" + boxPos.toShortString());
-            }
-            return true;
-        }
-        return false;
+        return boxPos != null;
     }
 
     @Override
     public boolean canContinueToUse() {
         if (critter.level().isClientSide()) return false;
         if (boxPos == null) return false;
+
+        if (isFinishing) return finishingTimer < 10;
+
         if (!critter.isEnrichmentNeeded()) return false;
         return isValidDigBox(boxPos);
     }
@@ -64,23 +61,33 @@ public class FindDigBoxGoal extends Goal {
     @Override
     public void start() {
         digTimer = 0;
+        isFinishing = false;
+        finishingTimer = 0;
         if (boxPos != null) {
             critter.getNavigation().moveTo(boxPos.getX() + 0.5, boxPos.getY() + 0.5, boxPos.getZ() + 0.5, speed);
         }
-        critter.debugGoalMessage("FindDigBoxGoal", "START");
     }
 
     @Override
     public void stop() {
         digTimer = 0;
         boxPos = null;
+        isFinishing = false;
+        finishingTimer = 0;
         critter.getNavigation().stop();
         setCritterDigging(false);
-        critter.debugGoalMessage("FindDigBoxGoal", "STOP");
     }
 
     @Override
     public void tick() {
+        if (isFinishing) {
+            finishingTimer++;
+            if (finishingTimer >= 10) {
+                this.stop();
+            }
+            return;
+        }
+
         if (boxPos == null) return;
 
         Vec3 boxCenter = new Vec3(boxPos.getX() + 0.5, boxPos.getY() + 0.5, boxPos.getZ() + 0.5);
@@ -99,8 +106,6 @@ public class FindDigBoxGoal extends Goal {
             return;
         }
 
-        // --- ESTÁ EN POSICIÓN ---
-
         critter.getNavigation().stop();
         critter.getLookControl().setLookAt(boxCenter.x, boxCenter.y - 0.5, boxCenter.z);
 
@@ -112,14 +117,10 @@ public class FindDigBoxGoal extends Goal {
         setCritterDigging(true);
         digTimer++;
 
-        if (DiverseCritter.DEBUG_BOWL_GOALS && digTimer % 20 == 0) {
-            System.out.println("[DIG-BOX-GOAL] Digging... Timer=" + digTimer + "/" + DIG_DURATION
-                    + " enrichment=" + critter.getEnrichment());
-        }
-
         if (digTimer >= DIG_DURATION) {
             performDigDrop();
-            this.stop();
+            setCritterDigging(false);
+            isFinishing = true;
         }
     }
 
@@ -145,8 +146,6 @@ public class FindDigBoxGoal extends Goal {
                             level.addFreshEntity(itemEntity);
 
                             critter.setEnrichment(critter.maxEnrichment());
-
-                            critter.debugGoalMessage("FindDigBoxGoal", "DIG SUCCESS: Dropped " + extracted);
                             return;
                         }
                     }

@@ -38,5 +38,7 @@
 
   "screen.diversityofcritters.species": "Species",
   "container.diversityofcritters.bowl": "Bowl",
-  "block.diversityofcritters.dig_box": "Dig Box"
+  "block.diversityofcritters.dig_box": "Dig Box",
+
+  "item.diversityofcritters.worm": "Worm"
 }

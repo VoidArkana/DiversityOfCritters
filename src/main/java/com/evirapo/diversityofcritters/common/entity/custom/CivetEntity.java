@@ -74,7 +74,9 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState drinkStartingState = new AnimationState();
     public final AnimationState drinkIdleState     = new AnimationState();
     public final AnimationState drinkEndingState   = new AnimationState();
-    public final AnimationState diggingAnimationState = new AnimationState();
+    public final AnimationState digStartingState = new AnimationState();
+    public final AnimationState digIdleState     = new AnimationState();
+    public final AnimationState digEndingState   = new AnimationState();
     public final AnimationState cleanStartingState = new AnimationState();
     public final AnimationState cleanIdleState     = new AnimationState();
     public final AnimationState cleanEndingState   = new AnimationState();
@@ -118,6 +120,10 @@ public class CivetEntity extends DiverseCritter {
     private boolean prevDrinkingClient = false;
     private int clientDrinkTick = 0;
     private int clientDrinkEndingTick = 0;
+
+    private boolean prevDiggingClient = false;
+    private int clientDigTick = 0;
+    private int clientDigEndingTick = 0;
 
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
@@ -178,10 +184,11 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(12, new CritterDrinkGoal(this));
         this.goalSelector.addGoal(13, new FindDigBoxGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(14, new ScratchLogGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(15, new DigDirtGoal(this));
 
-        this.goalSelector.addGoal(15, new CivetIdleGoal(this));
-        this.goalSelector.addGoal(16, new FollowParentGoal(this, 1.0D));
-        this.goalSelector.addGoal(17, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
+        this.goalSelector.addGoal(16, new CivetIdleGoal(this));
+        this.goalSelector.addGoal(17, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(18, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
                 boolean canWander = !isTame() || isWandering();
                 return canWander && super.canUse();
@@ -312,6 +319,26 @@ public class CivetEntity extends DiverseCritter {
             }
             this.prevDrinkingClient = currentDrinking;
 
+            boolean currentDigging = isDigging();
+
+            if (currentDigging && !prevDiggingClient) {
+                this.clientDigTick = 0;
+                this.clientDigEndingTick = 0;
+            } else if (!currentDigging && prevDiggingClient) {
+                this.clientDigEndingTick = 1;
+                this.clientDigTick = 0;
+            }
+
+            if (currentDigging) {
+                this.clientDigTick++;
+            } else if (this.clientDigEndingTick > 0) {
+                this.clientDigEndingTick++;
+                if (this.clientDigEndingTick > 11) {
+                    this.clientDigEndingTick = 0;
+                }
+            }
+            this.prevDiggingClient = currentDigging;
+
             setupAnimationStatesClient();
             handleCryingAnimationClient();
         }
@@ -325,6 +352,14 @@ public class CivetEntity extends DiverseCritter {
             int baseBowl = this.getDietConfig().hungerPerMeatBowl;
             int restore  = baseBowl + baseBowl / 4;
             this.setHunger(Math.min(this.getHunger() + restore, this.maxHunger()));
+
+            var foodProps = stack.isEdible() ? stack.getFoodProperties(this) : null;
+            if (foodProps != null) {
+                this.heal((float) foodProps.getNutrition());
+            } else {
+                this.heal(1.0F);
+            }
+            // -------------------------------------------------------------------
 
             this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), 0.0, 0.0, 0.0);
             this.level().playSound(null, this.blockPosition(), SoundEvents.GENERIC_EAT, SoundSource.AMBIENT);
@@ -453,7 +488,10 @@ public class CivetEntity extends DiverseCritter {
             this.drinkIdleState.stop();
             this.drinkEndingState.stop();
 
-            this.diggingAnimationState.stop();
+            this.digStartingState.stop();
+            this.digIdleState.stop();
+            this.digEndingState.stop();
+
             this.climbingUpState.stop();
             this.attackAnimationState.stop();
             return;
@@ -503,7 +541,6 @@ public class CivetEntity extends DiverseCritter {
 
         boolean isCleanPlaying = cleaning && cleanActive <= cleanTotal;
 
-        // --- CÁLCULO MÁQUINA DE ESTADOS: DRINKING DINÁMICO ---
         boolean drinking = IsDrinking();
         boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
         boolean isDrinkIdle     = drinking && this.clientDrinkTick > 5;
@@ -511,15 +548,21 @@ public class CivetEntity extends DiverseCritter {
 
         boolean isDrinkPlaying  = isDrinkStarting || isDrinkIdle || isDrinkEnding;
 
-        // Se usa isDrinkPlaying en lugar de drinking para que softIdle cubra la fase de salida
+        boolean digging = isDigging();
+        boolean isDigStarting = digging && this.clientDigTick <= 10;
+        boolean isDigIdle     = digging && this.clientDigTick > 10;
+        boolean isDigEnding   = !digging && this.clientDigEndingTick > 0;
+
+        boolean isDigPlaying  = isDigStarting || isDigIdle || isDigEnding;
+
         boolean softIdle = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
                 && !doingAttack && !hasTarget
-                && !this.isDigging()
                 && !isVariantPlaying
                 && !isScratchPlaying
                 && !isCleanPlaying
-                && !isDrinkPlaying;
+                && !isDrinkPlaying
+                && !isDigPlaying;
 
         this.idleAnimationState.animateWhen(softIdle, this.tickCount);
 
@@ -577,8 +620,17 @@ public class CivetEntity extends DiverseCritter {
             this.drinkEndingState.stop();
         }
 
+        if (isDigPlaying) {
+            this.digStartingState.animateWhen(isDigStarting, this.tickCount);
+            this.digIdleState.animateWhen(isDigIdle, this.tickCount);
+            this.digEndingState.animateWhen(isDigEnding, this.tickCount);
+        } else {
+            this.digStartingState.stop();
+            this.digIdleState.stop();
+            this.digEndingState.stop();
+        }
+
         this.climbingUpState.animateWhen(this.isClimbingUp(), this.tickCount);
-        this.diggingAnimationState.animateWhen(this.isDigging(), this.tickCount);
 
         if (this.isAttacking() && this.attackAnimationTimeout <= 0) {
             this.attackAnimationTimeout = 10;
@@ -589,7 +641,6 @@ public class CivetEntity extends DiverseCritter {
     }
 
     // --- INTERACTION & EVENTS ---
-
     @Override
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
         ItemStack itemstack = pPlayer.getItemInHand(pHand);
