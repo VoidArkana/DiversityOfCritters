@@ -189,6 +189,9 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.animate(entity.drinkingAnimationState, CivetAnims.DRINK, ageInTicks, 1.0F);
 		this.animate(entity.attackAnimationState,   CivetAnims.ATTACK, ageInTicks, 1.0F);
 		this.animate(entity.diggingAnimationState,   CivetAnims.DIGGING, ageInTicks, 1.0F);
+		this.animate(entity.scratchStartingState, CivetAnims.SCRATCHING_STARTING, ageInTicks, 1.0F);
+		this.animate(entity.scratchIdleState,     CivetAnims.SCRATCHING_IDLE,     ageInTicks, 1.0F);
+		this.animate(entity.scratchEndingState,   CivetAnims.SCRATCHING_ENDING,   ageInTicks, 1.0F);
 
 		if (this.young){
 			this.applyStatic(CivetAnims.BABY);

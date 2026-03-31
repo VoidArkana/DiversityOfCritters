@@ -77,6 +77,9 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState preparingCryState = new AnimationState();
     public final AnimationState cryingState = new AnimationState();
     public final AnimationState stoppingCryState = new AnimationState();
+    public final AnimationState scratchStartingState = new AnimationState();
+    public final AnimationState scratchIdleState     = new AnimationState();
+    public final AnimationState scratchEndingState   = new AnimationState();
 
     // --- IDLE VARIANTS ENUM ---
     public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
@@ -87,6 +90,7 @@ public class CivetEntity extends DiverseCritter {
     private static final EntityDataAccessor<Boolean> IS_CLIMBING  = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_DIGGING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> TICKS_CLIMBING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> IS_SCRATCHING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
 
     // --- VARIABLES ---
     public int idleVariantCooldown = 0;
@@ -98,11 +102,12 @@ public class CivetEntity extends DiverseCritter {
     private int stopCryTimer = 0;
     private boolean wasCryingClient = false;
 
-    // VARIABLES PARA CONTEO DE IDLE EN CLIENTE
     private IdleVariant prevClientVariant = IdleVariant.NONE;
     private int clientIdleTick = 0;
 
-    // --- CONSTRUCTOR ---
+    private boolean prevScratchingClient = false;
+    private int clientScratchTick = 0;
+
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
@@ -117,6 +122,7 @@ public class CivetEntity extends DiverseCritter {
         this.entityData.define(IS_DIGGING, false);
         this.entityData.define(TICKS_CLIMBING, 0);
         this.entityData.define(IDLE_VARIANT, toByte(IdleVariant.NONE));
+        this.entityData.define(IS_SCRATCHING, false);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -160,23 +166,23 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(11, new FindWaterBowlGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(12, new CritterDrinkGoal(this));
         this.goalSelector.addGoal(13, new FindDigBoxGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(14, new ScratchLogGoal(this, 1.1D, 16));
 
-        this.goalSelector.addGoal(14, new CivetIdleGoal(this));
-        this.goalSelector.addGoal(15, new FollowParentGoal(this, 1.0D));
-        this.goalSelector.addGoal(16, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
+        this.goalSelector.addGoal(15, new CivetIdleGoal(this));
+        this.goalSelector.addGoal(16, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(17, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
                 boolean canWander = !isTame() || isWandering();
                 return canWander && super.canUse();
             }
         });
-        this.goalSelector.addGoal(17, new LookAtPlayerGoal(this, Player.class, 6.0F));
-        this.goalSelector.addGoal(18, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(18, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(19, new RandomLookAroundGoal(this));
 
         this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
     }
 
-    // --- IDLE VARIANTS LOGIC ---
     private static byte toByte(IdleVariant v){
         return switch (v) {
             case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
@@ -247,6 +253,7 @@ public class CivetEntity extends DiverseCritter {
         }
 
         if (this.level().isClientSide) {
+            // --- CONTADOR DE IDLE ---
             IdleVariant currentVariant = getIdleVariant();
 
             if (currentVariant != prevClientVariant) {
@@ -257,6 +264,16 @@ public class CivetEntity extends DiverseCritter {
             if (currentVariant != IdleVariant.NONE) {
                 this.clientIdleTick++;
             }
+
+            boolean currentScratch = isScratching();
+            if (currentScratch != prevScratchingClient) {
+                this.clientScratchTick = 0;
+                this.prevScratchingClient = currentScratch;
+            }
+            if (currentScratch) {
+                this.clientScratchTick++;
+            }
+            // ------------------------------------
 
             setupAnimationStatesClient();
             handleCryingAnimationClient();
@@ -387,6 +404,11 @@ public class CivetEntity extends DiverseCritter {
             this.idleLayState.stop();
             this.idleLayEndingState.stop();
 
+            // Detener también el rascado si se le ordena sentarse
+            this.scratchStartingState.stop();
+            this.scratchIdleState.stop();
+            this.scratchEndingState.stop();
+
             this.cleanAnimationState.stop();
             this.diggingAnimationState.stop();
             this.climbingUpState.stop();
@@ -422,12 +444,22 @@ public class CivetEntity extends DiverseCritter {
         else if (v == IdleVariant.SIT && ticksActive <= sitTotal) isVariantPlaying = true;
         else if (v == IdleVariant.LAY && ticksActive <= layTotal) isVariantPlaying = true;
 
+        boolean scratching = isScratching();
+        int scratchActive = this.clientScratchTick;
+        int scratchStart = 10;
+        int scratchLoop  = 80;
+        int scratchEnd   = 10;
+        int scratchTotal = scratchStart + scratchLoop + scratchEnd;
+
+        boolean isScratchPlaying = scratching && scratchActive <= scratchTotal;
+
         boolean softIdle = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
                 && !doingAttack && !drinking && !hasTarget
                 && !this.isDigging()
                 && !isVariantPlaying
-                && !this.isCleaning();
+                && !this.isCleaning()
+                && !isScratchPlaying;
 
         this.idleAnimationState.animateWhen(softIdle, this.tickCount);
 
@@ -438,7 +470,7 @@ public class CivetEntity extends DiverseCritter {
         if (v == IdleVariant.SIT && isVariantPlaying) {
             this.idleSitStartingState.animateWhen(ticksActive <= sitStarting, this.tickCount);
             this.idleSitState.animateWhen(ticksActive > sitStarting && ticksActive <= sitStarting + sitIdle, this.tickCount);
-            this.idleSitEndingState.animateWhen(ticksActive > sitStarting + sitIdle, this.tickCount); // Límite superior eliminado
+            this.idleSitEndingState.animateWhen(ticksActive > sitStarting + sitIdle, this.tickCount);
         } else {
             this.idleSitStartingState.stop();
             this.idleSitState.stop();
@@ -453,6 +485,28 @@ public class CivetEntity extends DiverseCritter {
             this.idleLayStartingState.stop();
             this.idleLayState.stop();
             this.idleLayEndingState.stop();
+        }
+
+        if (isScratchPlaying) {
+            this.scratchStartingState.animateWhen(scratchActive <= scratchStart, this.tickCount);
+            this.scratchIdleState.animateWhen(scratchActive > scratchStart && scratchActive <= scratchStart + scratchLoop, this.tickCount);
+            this.scratchEndingState.animateWhen(scratchActive > scratchStart + scratchLoop, this.tickCount);
+        } else {
+            this.scratchStartingState.stop();
+            this.scratchIdleState.stop();
+            this.scratchEndingState.stop();
+        }
+
+        this.cleanAnimationState.animateWhen(this.isCleaning(), this.tickCount);
+        this.climbingUpState.animateWhen(this.isClimbingUp(), this.tickCount);
+        this.drinkingAnimationState.animateWhen(this.isAlive() && this.IsDrinking(), this.tickCount);
+        this.diggingAnimationState.animateWhen(this.isDigging(), this.tickCount);
+
+        if (this.isAttacking() && this.attackAnimationTimeout <= 0) {
+            this.attackAnimationTimeout = 10;
+            attackAnimationState.start(this.tickCount);
+        } else {
+            --this.attackAnimationTimeout;
         }
     }
 
@@ -578,6 +632,9 @@ public class CivetEntity extends DiverseCritter {
     public boolean isDigging() {return this.entityData.get(IS_DIGGING);}
     public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}
 
+    public boolean isScratching() { return this.entityData.get(IS_SCRATCHING); }
+    public void setScratching(boolean isScratching) { this.entityData.set(IS_SCRATCHING, isScratching); }
+
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
         return true;
     }
@@ -685,4 +742,5 @@ public class CivetEntity extends DiverseCritter {
         }
         return flag;
     }
+
 }

@@ -86,7 +86,6 @@ public class FindDigBoxGoal extends Goal {
         Vec3 boxCenter = new Vec3(boxPos.getX() + 0.5, boxPos.getY() + 0.5, boxPos.getZ() + 0.5);
         double distSq = critter.distanceToSqr(boxCenter);
 
-        // Verificamos si está lo suficientemente cerca y a la altura correcta
         boolean isOnTop = (distSq < MAX_DIST_SQ) && (critter.getY() >= boxPos.getY() + 0.4);
 
         if (!isOnTop) {
@@ -94,7 +93,6 @@ public class FindDigBoxGoal extends Goal {
             if (!critter.getNavigation().isInProgress()) {
                 critter.getNavigation().moveTo(boxCenter.x, boxCenter.y, boxCenter.z, speed);
             }
-            // Saltar si está pegado al bloque pero abajo
             if (distSq < MAX_DIST_SQ && critter.getY() < boxPos.getY() + 0.4) {
                 critter.getJumpControl().jump();
             }
@@ -106,11 +104,9 @@ public class FindDigBoxGoal extends Goal {
         critter.getNavigation().stop();
         critter.getLookControl().setLookAt(boxCenter.x, boxCenter.y - 0.5, boxCenter.z);
 
-        // CENTRADO AUTOMÁTICO:
-        // Si acabamos de llegar (digTimer es 0), forzamos la posición al centro exacto
         if (digTimer == 0) {
             critter.setPos(boxCenter.x, critter.getY(), boxCenter.z);
-            critter.setDeltaMovement(Vec3.ZERO); // Frenar en seco para que no resbale
+            critter.setDeltaMovement(Vec3.ZERO);
         }
 
         setCritterDigging(true);
