@@ -352,9 +352,7 @@ public class CivetEntity extends DiverseCritter {
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
 
         if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS) && !this.isNewborn()) {
-            int baseBowl = this.getDietConfig().hungerPerMeatBowl;
-            int restore  = baseBowl + baseBowl / 4;
-            this.setHunger(Math.min(this.getHunger() + restore, this.maxHunger()));
+            this.setHunger(this.maxHunger());
 
             var foodProps = stack.isEdible() ? stack.getFoodProperties(this) : null;
             if (foodProps != null) {
@@ -362,7 +360,7 @@ public class CivetEntity extends DiverseCritter {
             } else {
                 this.heal(1.0F);
             }
-            // -------------------------------------------------------------------
+            // ---------------------------------------------
 
             this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), 0.0, 0.0, 0.0);
             this.level().playSound(null, this.blockPosition(), SoundEvents.GENERIC_EAT, SoundSource.AMBIENT);
@@ -668,10 +666,11 @@ public class CivetEntity extends DiverseCritter {
         if (isMeatFood && !this.isBaby()) {
             if (this.getHunger() < this.maxHunger() || this.getHealth() < this.getMaxHealth()) {
                 if (!this.level().isClientSide()) {
-                    int restore = this.getDietConfig().hungerPerMeatBowl;
-                    this.setHunger(Math.min(this.getHunger() + restore, this.maxHunger()));
+                    this.setHunger(this.maxHunger());
+
                     var foodProps = itemstack.isEdible() ? itemstack.getFoodProperties(this) : null;
                     if (foodProps != null) this.heal((float) foodProps.getNutrition());
+
                     if (!pPlayer.getAbilities().instabuild) itemstack.shrink(1);
                     this.level().broadcastEntityEvent(this, (byte) 7);
                     this.gameEvent(GameEvent.EAT, this);

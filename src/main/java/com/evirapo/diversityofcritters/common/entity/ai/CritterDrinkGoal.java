@@ -115,18 +115,14 @@ public class CritterDrinkGoal extends Goal {
                 drinkTimer++;
 
                 if (drinkTimer >= 5 && (drinkTimer - 5) % 20 == 10) {
-                    CritterDietConfig diet = critter.getDietConfig();
-                    int prevThirst = critter.getThirst();
-                    this.critter.setThirst(Math.min(prevThirst + diet.thirstPerWaterBowl, critter.maxThirst()));
+                    this.critter.setThirst(this.critter.maxThirst());
                     this.critter.gameEvent(GameEvent.BLOCK_ACTIVATE);
                     this.critter.playSound(SoundEvents.GENERIC_SWIM, 0.7F, 0.5F + critter.getRandom().nextFloat());
                 }
 
-                if (drinkTimer >= 5 && (drinkTimer - 5) % 20 == 0) {
-                    if (critter.getThirst() >= critter.maxThirst()) {
-                        this.critter.setIsDrinking(false);
-                        this.isFinishing = true;
-                    }
+                if (critter.getThirst() >= critter.maxThirst()) {
+                    this.critter.setIsDrinking(false);
+                    this.isFinishing = true;
                 }
 
             } else {

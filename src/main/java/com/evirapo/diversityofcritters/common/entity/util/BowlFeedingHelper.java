@@ -67,18 +67,6 @@ public class BowlFeedingHelper {
             return false;
         }
 
-        int restorePerItem = switch (content) {
-            case MEAT -> diet.hungerPerMeatBowl;
-            case VEG  -> diet.hungerPerVegBowl;
-            case MIX  -> diet.hungerPerMixBowl;
-            default   -> 0;
-        };
-
-        if (restorePerItem <= 0) {
-            System.out.println("[BOWL-FOOD] restorePerItem <= 0, nada que curar");
-            return false;
-        }
-
         BlockEntity be = level.getBlockEntity(pos);
         if (!(be instanceof BowlBlockEntity bowlBe)) {
             System.out.println("[BOWL-FOOD] no hay BowlBlockEntity en " + pos.toShortString());
@@ -111,13 +99,26 @@ public class BowlFeedingHelper {
 
             System.out.println("    MATCH, consumiendo 1 ítem en slot " + i);
 
+            // Obtenemos las propiedades de nutrición ANTES de consumir el ítem
+            var foodProps = stack.isEdible() ? stack.getFoodProperties(critter) : null;
+
             stack.shrink(1);
             if (stack.isEmpty()) {
                 inv.setItem(i, ItemStack.EMPTY);
             }
 
             int before = critter.getHunger();
-            critter.setHunger(before + restorePerItem);
+
+            // --- NUEVA LÓGICA: 1 ítem = 100% de hambre ---
+            critter.setHunger(critter.maxHunger());
+
+            // --- BONUS: Recupera vida igual que al comer del suelo o de la mano ---
+            if (foodProps != null) {
+                critter.heal((float) foodProps.getNutrition());
+            } else {
+                critter.heal(1.0F); // Curación mínima si no tiene propiedades de comida
+            }
+
             int after = critter.getHunger();
 
             System.out.println("[BOWL-FOOD] Hunger " + before + " -> " + after);
@@ -148,14 +149,6 @@ public class BowlFeedingHelper {
             return false;
         }
 
-        CritterDietConfig diet = critter.getDietConfig();
-        int restore = diet.thirstPerWaterBowl;
-
-        if (restore <= 0) {
-            System.out.println("[BOWL-WATER] thirstPerWaterBowl <= 0, nada que curar");
-            return false;
-        }
-
         BlockEntity be = level.getBlockEntity(pos);
         if (!(be instanceof BowlBlockEntity bowlBe)) {
             System.out.println("[BOWL-WATER] no hay BowlBlockEntity en " + pos.toShortString());
@@ -171,7 +164,9 @@ public class BowlFeedingHelper {
         }
 
         int before = critter.getThirst();
-        critter.setThirst(before + restore);
+
+        critter.setThirst(critter.maxThirst());
+
         int after = critter.getThirst();
         System.out.println("[BOWL-WATER] Thirst " + before + " -> " + after);
 
