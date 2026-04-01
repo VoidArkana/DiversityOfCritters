@@ -69,12 +69,14 @@ public class CivetMoveControl extends MoveControl {
             this.civet.setSpeed((float)(this.speedModifier * this.civet.getAttributeValue(Attributes.MOVEMENT_SPEED)));
 
             if (dy > (double)this.civet.maxUpStep() && dx * dx + dz * dz < (double)Math.max(1.0F, this.civet.getBbWidth())) {
-                Vec3 motion = this.civet.getDeltaMovement();
-                this.civet.setDeltaMovement(
-                        motion.x * STEP_UP_HORIZONTAL_DAMPING,
-                        Math.max(motion.y, STEP_UP_IMPULSE),
-                        motion.z * STEP_UP_HORIZONTAL_DAMPING
-                );
+                if (!this.civet.isNewborn()) {
+                    Vec3 motion = this.civet.getDeltaMovement();
+                    this.civet.setDeltaMovement(
+                            motion.x * STEP_UP_HORIZONTAL_DAMPING,
+                            Math.max(motion.y, STEP_UP_IMPULSE),
+                            motion.z * STEP_UP_HORIZONTAL_DAMPING
+                    );
+                }
             }
 
         } else {

@@ -693,10 +693,6 @@ public class CivetEntity extends DiverseCritter {
     @Override
     public boolean onClimbable() { return isClimbing(); }
 
-    /**
-     * Checks adjacent blocks in all 4 cardinal directions for climbable blocks.
-     * Returns true if any adjacent block at foot or eye level is climbable.
-     */
     public boolean hasAdjacentClimbableBlock() {
         AABB box = this.getBoundingBox();
         double probeDistance = 0.3D;
@@ -726,11 +722,6 @@ public class CivetEntity extends DiverseCritter {
         return false;
     }
 
-    /**
-     * Returns the yaw angle (in degrees) that faces towards the nearest adjacent climbable wall.
-     * Used by the renderer to rotate the civet's body so its paws face the wall.
-     * Synced via EntityData so the client can read it.
-     */
     public float getClimbFacingYaw() { return this.entityData.get(CLIMB_FACING_YAW); }
 
     private void updateClimbFacingYaw() {
@@ -743,18 +734,11 @@ public class CivetEntity extends DiverseCritter {
         double halfW = (box.maxX - box.minX) * 0.5;
         double halfD = (box.maxZ - box.minZ) * 0.5;
 
-        // Check each cardinal direction for the closest climbable block
-        // MC yaw: 0=South(+Z), 90=West(-X), 180=North(-Z), 270=East(+X)
-        // We want the civet to FACE the wall, so:
-        //   wall at +X → civet faces East → yaw -90
-        //   wall at -X → civet faces West → yaw  90
-        //   wall at +Z → civet faces South → yaw   0
-        //   wall at -Z → civet faces North → yaw 180
         double[][] probes = {
-            { cx + halfW + probeDistance, cz,                           -90.0 },  // wall +X → face East
-            { cx - halfW - probeDistance, cz,                            90.0 },  // wall -X → face West
-            { cx,                         cz + halfD + probeDistance,     0.0 },  // wall +Z → face South
-            { cx,                         cz - halfD - probeDistance,   180.0 }   // wall -Z → face North
+            { cx + halfW + probeDistance, cz,                           -90.0 },
+            { cx - halfW - probeDistance, cz,                            90.0 },
+            { cx,                         cz + halfD + probeDistance,     0.0 },
+            { cx,                         cz - halfD - probeDistance,   180.0 }
         };
 
         for (double[] probe : probes) {
@@ -766,18 +750,11 @@ public class CivetEntity extends DiverseCritter {
         }
     }
 
-    /**
-     * Server-side climb state machine. Called every tick.
-     * Climbs UP when touching a climbable wall.
-     * HANG keeps the entity stuck to the wall without moving (set by CivetClimbGoal).
-     * When wall ends at the top, gives a ledge-boost impulse to mount the edge.
-     */
     private void updateClimbState() {
         boolean touchingWall = this.horizontalCollision;
         boolean hasClimbable = this.hasAdjacentClimbableBlock();
         byte currentState = this.getClimbState();
 
-        // HANG state is managed externally by CivetClimbGoal — only exit if wall is lost
         if (currentState == CLIMB_HANG) {
             if (!hasClimbable) {
                 this.setClimbState(CLIMB_NONE);
@@ -787,29 +764,23 @@ public class CivetEntity extends DiverseCritter {
             return;
         }
 
-        if (touchingWall && hasClimbable) {
-            // Touching a climbable wall = climb up
+        if (touchingWall && hasClimbable && !this.isScratching() && !this.isNewborn()) {
             this.setClimbState(CLIMB_UP);
             this.updateClimbFacingYaw();
             this.lockClimbRotation();
         } else if (currentState == CLIMB_UP && !hasClimbable && !this.onGround()) {
-            // Was climbing UP but ran out of wall (reached the top edge)
-            // Give a ledge-boost impulse to vault over the edge
-            // Yaw convention: 0=South(+Z), 90=West(-X), 180=North(-Z), 270=East(+X)
             float yawRad = this.getYRot() * ((float) Math.PI / 180F);
             double boostX = -Math.sin(yawRad) * 0.25D;
             double boostZ =  Math.cos(yawRad) * 0.25D;
             this.setDeltaMovement(boostX, 0.4D, boostZ);
             this.setClimbState(CLIMB_NONE);
         } else if (currentState != CLIMB_NONE) {
-            // Was climbing, but lost the wall or landed
             if (this.onGround() || !hasClimbable) {
                 this.setClimbState(CLIMB_NONE);
             }
         }
     }
 
-    /** Lock yaw/body/head rotation to face the wall while climbing */
     private void lockClimbRotation() {
         float wallYaw = this.getClimbFacingYaw();
         this.setYRot(wallYaw);

@@ -34,7 +34,6 @@ public class DigDirtGoal extends Goal {
     public boolean canUse() {
         if (civet.isNewborn() || level.isClientSide) return false;
 
-        // MISMO TRIGGER: Solo si necesita enriquecimiento
         if (!civet.isEnrichmentNeeded()) return false;
 
         targetBlock = findDirtBlock();
@@ -74,7 +73,6 @@ public class DigDirtGoal extends Goal {
 
         if (targetBlock == null) return;
 
-        // Usamos 1.8D para que se pegue bien al bloque
         double distSq = civet.distanceToSqr(targetBlock.getX() + 0.5, civet.getY(), targetBlock.getZ() + 0.5);
 
         if (distSq > 1.8D) {

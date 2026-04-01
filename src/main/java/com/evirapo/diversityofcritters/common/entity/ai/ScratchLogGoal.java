@@ -4,6 +4,7 @@ import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
@@ -14,6 +15,8 @@ public class ScratchLogGoal extends Goal {
     private final int searchRadius;
     private BlockPos logPos;
     private int scratchTimer = 0;
+
+    private int searchCooldown = 0;
 
     private static final int TOTAL_DURATION = 100;
 
@@ -26,12 +29,23 @@ public class ScratchLogGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (searchCooldown > 0) {
+            searchCooldown--;
+            return false;
+        }
+
         if (civet.level().isClientSide() || !civet.isEnrichmentNeeded() || civet.isNewborn()) {
             return false;
         }
 
         logPos = findNearestLog();
-        return logPos != null;
+
+        if (logPos == null) {
+            searchCooldown = 40;
+            return false;
+        }
+
+        return true;
     }
 
     @Override
@@ -57,22 +71,31 @@ public class ScratchLogGoal extends Goal {
     public void tick() {
         if (logPos == null) return;
 
-        double distSq = civet.distanceToSqr(logPos.getX() + 0.5, civet.getY(), logPos.getZ() + 0.5);
+        net.minecraft.world.phys.AABB logBox = new net.minecraft.world.phys.AABB(logPos);
+        boolean isTouchingLog = civet.getBoundingBox().inflate(0.05D).intersects(logBox);
 
-        if (distSq > 0.80D) {
+        civet.getLookControl().setLookAt(logPos.getX() + 0.5, logPos.getY() + 0.5, logPos.getZ() + 0.5);
+
+        if (!isTouchingLog) {
             civet.setScratching(false);
+            scratchTimer = 0;
+
             if (!civet.getNavigation().isInProgress()) {
-                civet.getNavigation().moveTo(logPos.getX() + 0.5, logPos.getY(), logPos.getZ() + 0.5, speed);
+
+                Vec3 civetPos = civet.position();
+                Vec3 targetPos = new Vec3(logPos.getX() + 0.5, civet.getY(), logPos.getZ() + 0.5);
+
+                Vec3 direction = targetPos.subtract(civetPos).normalize().scale(0.05D);
+
+                civet.setDeltaMovement(direction.x, civet.getDeltaMovement().y, direction.z);
             }
             return;
         }
 
         civet.getNavigation().stop();
-        civet.getLookControl().setLookAt(logPos.getX() + 0.5, logPos.getY() + 0.5, logPos.getZ() + 0.5);
 
-        if (scratchTimer == 0) {
-            civet.setDeltaMovement(Vec3.ZERO);
-        }
+        Vec3 dm = civet.getDeltaMovement();
+        civet.setDeltaMovement(0, dm.y, 0);
 
         civet.setScratching(true);
         scratchTimer++;

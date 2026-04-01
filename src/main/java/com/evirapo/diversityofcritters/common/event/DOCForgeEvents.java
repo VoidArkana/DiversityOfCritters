@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.common.event;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.command.SetNeedsCommand;
 import com.evirapo.diversityofcritters.common.command.SetPregnancyCommand;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -12,5 +13,6 @@ public class DOCForgeEvents {
     @SubscribeEvent
     public static void onCommandsRegister(RegisterCommandsEvent event) {
         SetPregnancyCommand.register(event.getDispatcher());
+        SetNeedsCommand.register(event.getDispatcher());
     }
 }

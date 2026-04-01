@@ -27,12 +27,11 @@ public class CivetCleanGoal extends Goal {
             return false;
         }
 
-        if (entity.getHygiene() >= entity.maxHygiene()) {
+        if (!entity.hasLowHygiene()) {
             return false;
         }
 
-        float chance = entity.hasLowHygiene() ? 0.02f : 0.001f;
-        return entity.getRandom().nextFloat() < chance;
+        return entity.getRandom().nextFloat() < 0.005f;
     }
 
     @Override
@@ -42,7 +41,7 @@ public class CivetCleanGoal extends Goal {
             return false;
         }
 
-        return cleanTimer > 0 && entity.getHygiene() < entity.maxHygiene();
+        return cleanTimer > 0;
     }
 
     @Override
@@ -62,8 +61,7 @@ public class CivetCleanGoal extends Goal {
     public void tick() {
         this.cleanTimer--;
         if (this.cleanTimer == 1) {
-            int recovery = entity.hasLowHygiene() ? 600 : 400;
-            this.entity.setHygiene(Math.min(this.entity.maxHygiene(), this.entity.getHygiene() + recovery));
+            this.entity.setHygiene(this.entity.maxHygiene());
         }
     }
 }

@@ -20,7 +20,7 @@ public class MotherCleanBabyGoal extends Goal {
     private boolean isFinishing = false;
     private int finishingTimer = 0;
 
-    private static final double MAX_CLEAN_DIST_SQ = 1.5D;
+    private static final double MAX_CLEAN_DIST_SQ = 0.8D;
 
     public MotherCleanBabyGoal(CivetEntity mother, double speed, double searchRadius) {
         this.mother = mother;
@@ -57,7 +57,7 @@ public class MotherCleanBabyGoal extends Goal {
         mother.setIsDrinking(false);
 
         if (targetBaby != null) {
-            targetBaby.addTag("being_cleaned");
+            targetBaby.isBeingCleaned = true;
         }
     }
 
@@ -70,7 +70,7 @@ public class MotherCleanBabyGoal extends Goal {
         mother.getNavigation().stop();
 
         if (targetBaby != null) {
-            targetBaby.removeTag("being_cleaned");
+            targetBaby.isBeingCleaned = false;
         }
         targetBaby = null;
     }
@@ -89,7 +89,7 @@ public class MotherCleanBabyGoal extends Goal {
 
         targetBaby.getNavigation().stop();
         Vec3 babyDm = targetBaby.getDeltaMovement();
-        targetBaby.setDeltaMovement(0, babyDm.y, 0);
+        targetBaby.setDeltaMovement(0, babyDm.y, 0); // Anclamos X/Z pero mantenemos gravedad Y
         targetBaby.getLookControl().setLookAt(mother, 10.0F, (float) targetBaby.getMaxHeadXRot());
 
         if (targetBaby.getHygiene() >= targetBaby.maxHygiene()) {
@@ -115,8 +115,7 @@ public class MotherCleanBabyGoal extends Goal {
         cleanTimer++;
 
         if (cleanTimer % 20 == 15) {
-            int recovery = targetBaby.hasLowHygiene() ? 600 : 400;
-            targetBaby.setHygiene(Math.min(targetBaby.maxHygiene(), targetBaby.getHygiene() + recovery));
+            targetBaby.setHygiene(targetBaby.maxHygiene());
         }
     }
 
@@ -126,7 +125,7 @@ public class MotherCleanBabyGoal extends Goal {
         List<CivetEntity> nearbyCivets = mother.level().getEntitiesOfClass(CivetEntity.class, searchBox,
                 (civet) -> civet.isNewborn()
                         && civet.hasLowHygiene()
-                        && !civet.getTags().contains("being_cleaned"));
+                        && !civet.isBeingCleaned);
 
         if (nearbyCivets.isEmpty()) {
             return null;
