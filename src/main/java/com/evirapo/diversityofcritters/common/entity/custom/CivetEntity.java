@@ -7,7 +7,6 @@ import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Vec3i;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -43,7 +42,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.common.ForgeMod;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.fluids.FluidType;
@@ -65,7 +63,9 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState idleLayStartingState = new AnimationState();
     public final AnimationState idleLayState         = new AnimationState();
     public final AnimationState idleLayEndingState   = new AnimationState();
-    public final AnimationState climbingUpState    = new AnimationState();
+    public final AnimationState climbIdleState      = new AnimationState();
+    public final AnimationState climbingUpState     = new AnimationState();
+    public final AnimationState climbingDownState   = new AnimationState();
     public final AnimationState attackAnimationState = new AnimationState();
     public final AnimationState drinkStartingState = new AnimationState();
     public final AnimationState drinkIdleState     = new AnimationState();
@@ -89,15 +89,19 @@ public class CivetEntity extends DiverseCritter {
     // --- DATA ---
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
 
-    private static final EntityDataAccessor<Boolean> IS_CLIMBING  = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
+    // Climb state: 0=NONE, 1=UP, 2=DOWN
+    private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Float> CLIMB_FACING_YAW = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> IS_DIGGING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Integer> TICKS_CLIMBING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> IS_SCRATCHING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
+
+    public static final byte CLIMB_NONE = 0;
+    public static final byte CLIMB_UP   = 1;
+    public static final byte CLIMB_DOWN = 2;
+    public static final byte CLIMB_HANG = 3;
 
     // --- VARIABLES ---
     public int idleVariantCooldown = 0;
-    public boolean isClimbableX;
-    public boolean isClimbableZ;
     private LookForFoodItems forFoodGoal;
     private int tamingFeedsLeft = 0;
     private int cryTimer = 0;
@@ -136,9 +140,9 @@ public class CivetEntity extends DiverseCritter {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        this.entityData.define(IS_CLIMBING, false);
+        this.entityData.define(CLIMB_STATE, CLIMB_NONE);
+        this.entityData.define(CLIMB_FACING_YAW, 0.0F);
         this.entityData.define(IS_DIGGING, false);
-        this.entityData.define(TICKS_CLIMBING, 0);
         this.entityData.define(IDLE_VARIANT, toByte(IdleVariant.NONE));
         this.entityData.define(IS_SCRATCHING, false);
     }
@@ -187,6 +191,7 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(14, new FindDigBoxGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(15, new ScratchLogGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(16, new DigDirtGoal(this));
+        this.goalSelector.addGoal(16, new CivetClimbGoal(this, 1.1D, 16));
 
         this.goalSelector.addGoal(17, new CivetIdleGoal(this));
         this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
@@ -224,7 +229,7 @@ public class CivetEntity extends DiverseCritter {
         super.tick();
 
         if (!this.level().isClientSide) {
-            this.setClimbing(this.horizontalCollision && (this.isClimbableX || this.isClimbableZ));
+            this.updateClimbState();
 
             boolean isNewborn = this.isNewborn();
             double desiredSpeed = isNewborn ? 0.095D : 0.2D;
@@ -378,32 +383,13 @@ public class CivetEntity extends DiverseCritter {
             this.climbRewardCooldown--;
         }
 
-        Vec3 vec3 = this.getDeltaMovement();
-        if (this.isClimbing() && (Math.abs(vec3.y) > 0.1D)) {
-            if (!this.level().isClientSide && this.getTicksClimbing() < 3) {
-                this.setTicksClimbing(this.getTicksClimbing()+1);
-            }
-
-            if (!this.level().isClientSide && vec3.y > 0.1D) {
+        if (!this.level().isClientSide) {
+            if (this.isClimbing()) {
                 this.climbRewardArmed = true;
-            }
-        } else {
-            if (!this.level().isClientSide && this.getTicksClimbing() > 0) {
-                this.setTicksClimbing(this.getTicksClimbing()-1);
-            }
-
-            if (!this.level().isClientSide
-                    && this.climbRewardArmed
-                    && this.onGround()
-                    && !this.isClimbing()
-                    && this.climbRewardCooldown <= 0) {
+            } else if (this.climbRewardArmed && this.onGround() && this.climbRewardCooldown <= 0) {
                 this.setEnrichment(this.maxEnrichment());
                 this.climbRewardArmed = false;
                 this.climbRewardCooldown = 20;
-            }
-
-            if (!this.level().isClientSide && !this.isClimbing() && this.onGround() && vec3.y <= 0.0D) {
-                this.climbRewardArmed = false;
             }
         }
     }
@@ -421,52 +407,6 @@ public class CivetEntity extends DiverseCritter {
     }
 
     // --- MOVEMENT & PHYSICS ---
-    @Override
-    public void move(MoverType pType, Vec3 pPos) {
-        super.move(pType, pPos);
-        if (!this.noPhysics){
-            Vec3 vec3 = this.collide(pPos);
-            boolean flagX = !Mth.equal(pPos.x, vec3.x);
-            boolean flagZ = !Mth.equal(pPos.z, vec3.z);
-
-            if (!this.navigation.isDone()){
-                if (flagX){
-                    BlockPos bp = new BlockPos(new Vec3i((int)(this.getX()+Math.max(-1, Math.min(1, pPos.x*100))), (int)this.getY(), (int)this.getZ()));
-                    BlockState bs = this.level().getBlockState(bp);
-                    this.isClimbableX = bs.is(DoCTags.Blocks.CIVET_CLIMBABLE);
-                    this.setClimbing(this.isClimbableX);
-                } else if (flagZ){
-                    BlockPos bp = new BlockPos(new Vec3i((int)this.getX(), (int)this.getY(), (int)(this.getZ()+Math.max(-1, Math.min(1, pPos.z*100)))));
-                    BlockState bs = this.level().getBlockState(bp);
-                    this.isClimbableZ = bs.is(DoCTags.Blocks.CIVET_CLIMBABLE);
-                    this.setClimbing(this.isClimbableZ);
-                }
-            }
-        }
-    }
-
-    private Vec3 collide(Vec3 pVec) {
-        AABB aabb = this.getBoundingBox();
-        List<VoxelShape> list = this.level().getEntityCollisions(this, aabb.expandTowards(pVec));
-        Vec3 vec3 = pVec.lengthSqr() == 0.0D ? pVec : collideBoundingBox(this, pVec, aabb, this.level(), list);
-        boolean flag = pVec.x != vec3.x;
-        boolean flag1 = pVec.y != vec3.y;
-        boolean flag2 = pVec.z != vec3.z;
-        boolean flag3 = this.onGround() || flag1 && pVec.y < 0.0D;
-        float stepHeight = getStepHeight();
-        if (stepHeight > 0.0F && flag3 && (flag || flag2)) {
-            Vec3 vec31 = collideBoundingBox(this, new Vec3(pVec.x, stepHeight, pVec.z), aabb, this.level(), list);
-            Vec3 vec32 = collideBoundingBox(this, new Vec3(0.0D, stepHeight, 0.0D), aabb.expandTowards(pVec.x, 0.0D, pVec.z), this.level(), list);
-            if (vec32.y < (double)stepHeight) {
-                Vec3 vec33 = collideBoundingBox(this, new Vec3(pVec.x, 0.0D, pVec.z), aabb.move(vec32), this.level(), list).add(vec32);
-                if (vec33.horizontalDistanceSqr() > vec31.horizontalDistanceSqr()) vec31 = vec33;
-            }
-            if (vec31.horizontalDistanceSqr() > vec3.horizontalDistanceSqr()) {
-                return vec31.add(collideBoundingBox(this, new Vec3(0.0D, -vec31.y + pVec.y, 0.0D), aabb.move(vec31), this.level(), list));
-            }
-        }
-        return vec3;
-    }
 
     @Override
     public boolean causeFallDamage(float pFallDistance, float pMultiplier, DamageSource pSource) {
@@ -622,7 +562,12 @@ public class CivetEntity extends DiverseCritter {
             this.digEndingState.stop();
         }
 
-        this.climbingUpState.animateWhen(this.isClimbingUp(), this.tickCount);
+        boolean climbUp   = this.isClimbingUp();
+        boolean climbDown = this.isClimbingDown();
+        boolean climbHang = this.isHanging();
+        this.climbingUpState.animateWhen(climbUp, this.tickCount);
+        this.climbingDownState.animateWhen(climbDown, this.tickCount);
+        this.climbIdleState.animateWhen(climbHang, this.tickCount);
 
         if (this.isAttacking() && this.attackAnimationTimeout <= 0) {
             this.attackAnimationTimeout = 10;
@@ -737,12 +682,142 @@ public class CivetEntity extends DiverseCritter {
     @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
     @Override protected boolean getDefaultDiurnal() { return true; }
 
-    public boolean isClimbing() { return this.entityData.get(IS_CLIMBING); }
-    public int getTicksClimbing() { return this.entityData.get(TICKS_CLIMBING); }
-    public void setTicksClimbing(int v) { this.entityData.set(TICKS_CLIMBING, v); }
-    public boolean isClimbingUp() { return this.isClimbing() && this.getDeltaMovement().y>0.1f; }
-    public void setClimbing(boolean v) { this.entityData.set(IS_CLIMBING, v); }
+    // --- CLIMB STATE ---
+    public byte getClimbState() { return this.entityData.get(CLIMB_STATE); }
+    public void setClimbState(byte state) { this.entityData.set(CLIMB_STATE, state); }
+    public boolean isClimbing() { return getClimbState() != CLIMB_NONE; }
+    public boolean isClimbingUp() { return getClimbState() == CLIMB_UP; }
+    public boolean isClimbingDown() { return getClimbState() == CLIMB_DOWN; }
+    public boolean isHanging() { return getClimbState() == CLIMB_HANG; }
+
+    @Override
     public boolean onClimbable() { return isClimbing(); }
+
+    /**
+     * Checks adjacent blocks in all 4 cardinal directions for climbable blocks.
+     * Returns true if any adjacent block at foot or eye level is climbable.
+     */
+    public boolean hasAdjacentClimbableBlock() {
+        AABB box = this.getBoundingBox();
+        double probeDistance = 0.3D;
+        int footY = Mth.floor(box.minY);
+        int eyeY  = Mth.floor(box.minY + this.getBbHeight() * 0.5);
+
+        double cx = (box.minX + box.maxX) * 0.5;
+        double cz = (box.minZ + box.maxZ) * 0.5;
+        double halfW = (box.maxX - box.minX) * 0.5;
+        double halfD = (box.maxZ - box.minZ) * 0.5;
+
+        int[][] offsets = {
+            { Mth.floor(cx + halfW + probeDistance), Mth.floor(cz) },   // +X
+            { Mth.floor(cx - halfW - probeDistance), Mth.floor(cz) },   // -X
+            { Mth.floor(cx), Mth.floor(cz + halfD + probeDistance) },   // +Z
+            { Mth.floor(cx), Mth.floor(cz - halfD - probeDistance) }    // -Z
+        };
+
+        for (int[] off : offsets) {
+            BlockPos posFoot = new BlockPos(off[0], footY, off[1]);
+            BlockPos posEye  = new BlockPos(off[0], eyeY,  off[1]);
+            if (this.level().getBlockState(posFoot).is(DoCTags.Blocks.CIVET_CLIMBABLE)
+             || this.level().getBlockState(posEye).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns the yaw angle (in degrees) that faces towards the nearest adjacent climbable wall.
+     * Used by the renderer to rotate the civet's body so its paws face the wall.
+     * Synced via EntityData so the client can read it.
+     */
+    public float getClimbFacingYaw() { return this.entityData.get(CLIMB_FACING_YAW); }
+
+    private void updateClimbFacingYaw() {
+        AABB box = this.getBoundingBox();
+        double probeDistance = 0.3D;
+        int footY = Mth.floor(box.minY);
+
+        double cx = (box.minX + box.maxX) * 0.5;
+        double cz = (box.minZ + box.maxZ) * 0.5;
+        double halfW = (box.maxX - box.minX) * 0.5;
+        double halfD = (box.maxZ - box.minZ) * 0.5;
+
+        // Check each cardinal direction for the closest climbable block
+        // MC yaw: 0=South(+Z), 90=West(-X), 180=North(-Z), 270=East(+X)
+        // We want the civet to FACE the wall, so:
+        //   wall at +X → civet faces East → yaw -90
+        //   wall at -X → civet faces West → yaw  90
+        //   wall at +Z → civet faces South → yaw   0
+        //   wall at -Z → civet faces North → yaw 180
+        double[][] probes = {
+            { cx + halfW + probeDistance, cz,                           -90.0 },  // wall +X → face East
+            { cx - halfW - probeDistance, cz,                            90.0 },  // wall -X → face West
+            { cx,                         cz + halfD + probeDistance,     0.0 },  // wall +Z → face South
+            { cx,                         cz - halfD - probeDistance,   180.0 }   // wall -Z → face North
+        };
+
+        for (double[] probe : probes) {
+            BlockPos pos = new BlockPos(Mth.floor(probe[0]), footY, Mth.floor(probe[1]));
+            if (this.level().getBlockState(pos).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                this.entityData.set(CLIMB_FACING_YAW, (float) probe[2]);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Server-side climb state machine. Called every tick.
+     * Climbs UP when touching a climbable wall.
+     * HANG keeps the entity stuck to the wall without moving (set by CivetClimbGoal).
+     * When wall ends at the top, gives a ledge-boost impulse to mount the edge.
+     */
+    private void updateClimbState() {
+        boolean touchingWall = this.horizontalCollision;
+        boolean hasClimbable = this.hasAdjacentClimbableBlock();
+        byte currentState = this.getClimbState();
+
+        // HANG state is managed externally by CivetClimbGoal — only exit if wall is lost
+        if (currentState == CLIMB_HANG) {
+            if (!hasClimbable) {
+                this.setClimbState(CLIMB_NONE);
+            } else {
+                this.lockClimbRotation();
+            }
+            return;
+        }
+
+        if (touchingWall && hasClimbable) {
+            // Touching a climbable wall = climb up
+            this.setClimbState(CLIMB_UP);
+            this.updateClimbFacingYaw();
+            this.lockClimbRotation();
+        } else if (currentState == CLIMB_UP && !hasClimbable && !this.onGround()) {
+            // Was climbing UP but ran out of wall (reached the top edge)
+            // Give a ledge-boost impulse to vault over the edge
+            // Yaw convention: 0=South(+Z), 90=West(-X), 180=North(-Z), 270=East(+X)
+            float yawRad = this.getYRot() * ((float) Math.PI / 180F);
+            double boostX = -Math.sin(yawRad) * 0.25D;
+            double boostZ =  Math.cos(yawRad) * 0.25D;
+            this.setDeltaMovement(boostX, 0.4D, boostZ);
+            this.setClimbState(CLIMB_NONE);
+        } else if (currentState != CLIMB_NONE) {
+            // Was climbing, but lost the wall or landed
+            if (this.onGround() || !hasClimbable) {
+                this.setClimbState(CLIMB_NONE);
+            }
+        }
+    }
+
+    /** Lock yaw/body/head rotation to face the wall while climbing */
+    private void lockClimbRotation() {
+        float wallYaw = this.getClimbFacingYaw();
+        this.setYRot(wallYaw);
+        this.yRotO = wallYaw;
+        this.setYBodyRot(wallYaw);
+        this.yBodyRotO = wallYaw;
+        this.setYHeadRot(wallYaw);
+    }
 
     public boolean isDigging() {return this.entityData.get(IS_DIGGING);}
     public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}

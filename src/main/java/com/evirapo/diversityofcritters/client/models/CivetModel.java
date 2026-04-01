@@ -109,8 +109,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.root().getAllParts().forEach(ModelPart::resetPose);
 
 		boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
-
-		// Usamos el nuevo método isOrderedSitPlaying() para abarcar las 3 fases (Start, Idle, End)
 		boolean orderedSitPlaying = entity.isOrderedSitPlaying();
 
 		if (entity.isJuvenile()) {
@@ -141,9 +139,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
 			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
 			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
-
-			// HEMOS ELIMINADO EL entity.sitState y el return; AQUÍ.
-			// Ahora el código continuará hacia abajo para leer las 3 nuevas animaciones.
 		}
 
 		if (entity.idleAnimationState.isStarted() && limbSwingAmount <= 0.01f) {
@@ -154,10 +149,9 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.climbing = entity.isClimbing();
 
 		if (entity.isClimbing()){
-			this.animate(entity.climbingUpState, CivetAnims.CLIMBING_UP, ageInTicks, 1.0F);
-			if (entity.isClimbingUp()) {
-				this.animateWalk(CivetAnims.CLIMBING_UP, limbSwing, Math.max(0.1f, limbSwingAmount), 2.0f, 2.5f);
-			}
+			this.animate(entity.climbingUpState,   CivetAnims.CLIMBING_UP,   ageInTicks, 1.0F);
+			this.animate(entity.climbingDownState, CivetAnims.CLIMBING_DOWN, ageInTicks, 1.0F);
+			this.animate(entity.climbIdleState,    CivetAnims.CLIMB_IDLE,    ageInTicks, 1.0F);
 		} else {
 			if (entity.isInWaterOrBubble()){
 				this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
@@ -213,7 +207,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		poseStack.scale(baseScale, baseScale, baseScale);
 		poseStack.translate(0, 1.65F, 0);
 
-		if (this.climbing){
+		if (this.climbing) {
 			poseStack.mulPose(Axis.XP.rotationDegrees(-90));
 			poseStack.translate(0, -0.4f, 0.25f);
 		}

@@ -8,12 +8,6 @@ import net.minecraft.client.animation.KeyframeAnimations;
 public class CivetAnims {
 
 	public static final AnimationDefinition CLIMB_IDLE = AnimationDefinition.Builder.withLength(4.0F).looping()
-			.addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.ROTATION,
-					new Keyframe(0.0F, KeyframeAnimations.degreeVec(-90.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
-			))
-			.addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.POSITION,
-					new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, 10.0F, -16.0F), AnimationChannel.Interpolations.LINEAR)
-			))
 			.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION,
 					new Keyframe(0.0F, KeyframeAnimations.degreeVec(-2.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM)
 			))
@@ -71,12 +65,6 @@ public class CivetAnims {
 			.build();
 
 	public static final AnimationDefinition CLIMBING_UP = AnimationDefinition.Builder.withLength(1.0F).looping()
-			.addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.ROTATION,
-					new Keyframe(0.0F, KeyframeAnimations.degreeVec(-90.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
-			))
-			.addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.POSITION,
-					new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, 10.0F, -16.0F), AnimationChannel.Interpolations.LINEAR)
-			))
 			.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION,
 					new Keyframe(0.0F, KeyframeAnimations.degreeVec(7.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
 					new Keyframe(0.25F, KeyframeAnimations.degreeVec(-7.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -173,12 +161,6 @@ public class CivetAnims {
 			.build();
 
 	public static final AnimationDefinition CLIMBING_DOWN = AnimationDefinition.Builder.withLength(1.0F).looping()
-			.addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.ROTATION,
-					new Keyframe(0.0F, KeyframeAnimations.degreeVec(-90.0F, 0.0F, -180.0F), AnimationChannel.Interpolations.LINEAR)
-			))
-			.addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.POSITION,
-					new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, 10.0F, -16.0F), AnimationChannel.Interpolations.LINEAR)
-			))
 			.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION,
 					new Keyframe(0.0F, KeyframeAnimations.degreeVec(7.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
 					new Keyframe(0.25F, KeyframeAnimations.degreeVec(-7.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
