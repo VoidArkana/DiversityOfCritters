@@ -41,7 +41,6 @@ public class FindCryingBabyGoal extends Goal {
         }
 
         this.targetBaby = list.get(0);
-        System.out.println("[IA-MADRE] ¡Bebé llorando detectado! ID: " + targetBaby.getId());
         return true;
     }
 
@@ -54,7 +53,6 @@ public class FindCryingBabyGoal extends Goal {
     public void start() {
         this.feedTimer = 0;
         this.parent.getNavigation().moveTo(this.targetBaby, this.speedModifier);
-        System.out.println("[IA-MADRE] Corriendo hacia el bebé...");
     }
 
     @Override
@@ -62,7 +60,6 @@ public class FindCryingBabyGoal extends Goal {
         this.targetBaby = null;
         this.feedTimer = 0;
         this.parent.getNavigation().stop();
-        System.out.println("[IA-MADRE] Goal finalizado.");
     }
 
     @Override
@@ -77,10 +74,6 @@ public class FindCryingBabyGoal extends Goal {
             this.parent.getNavigation().stop();
             this.feedTimer++;
 
-            if (this.feedTimer % 10 == 0) {
-                System.out.println("[IA-MADRE] Alimentando... (" + feedTimer + "/" + FEEDING_DURATION + " ticks)");
-            }
-
             if (this.feedTimer >= FEEDING_DURATION) {
                 performNursing();
             }
@@ -93,14 +86,13 @@ public class FindCryingBabyGoal extends Goal {
     }
 
     private void performNursing() {
-        System.out.println("[IA-MADRE] --- CURANDO AL BEBÉ (FINALIZADO) ---");
 
         targetBaby.setHunger(targetBaby.maxHunger());
         targetBaby.setThirst(targetBaby.maxThirst());
         targetBaby.setCrying(false);
 
         Level level = parent.level();
-        level.broadcastEntityEvent(targetBaby, (byte) 7); // Corazones
+        level.broadcastEntityEvent(targetBaby, (byte) 7);
         parent.playSound(SoundEvents.CAT_PURR, 1.0F, 1.0F);
 
     }

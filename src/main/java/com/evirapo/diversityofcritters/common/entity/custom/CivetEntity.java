@@ -125,6 +125,8 @@ public class CivetEntity extends DiverseCritter {
     private int clientDigTick = 0;
     private int clientDigEndingTick = 0;
 
+    public boolean isBeingCleaned = false;
+
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
@@ -176,26 +178,27 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(7, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
 
         this.goalSelector.addGoal(8, new CivetCleanGoal(this));
+        this.goalSelector.addGoal(9, new MotherCleanBabyGoal(this, 1.2D, 16.0D));
         this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS);
-        this.goalSelector.addGoal(9, this.forFoodGoal);
+        this.goalSelector.addGoal(10, this.forFoodGoal);
 
-        this.goalSelector.addGoal(10, new FindFoodBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(11, new FindWaterBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(12, new CritterDrinkGoal(this));
-        this.goalSelector.addGoal(13, new FindDigBoxGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(14, new ScratchLogGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(15, new DigDirtGoal(this));
+        this.goalSelector.addGoal(11, new FindFoodBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(12, new FindWaterBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(13, new CritterDrinkGoal(this));
+        this.goalSelector.addGoal(14, new FindDigBoxGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(15, new ScratchLogGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(16, new DigDirtGoal(this));
 
-        this.goalSelector.addGoal(16, new CivetIdleGoal(this));
-        this.goalSelector.addGoal(17, new FollowParentGoal(this, 1.0D));
-        this.goalSelector.addGoal(18, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
+        this.goalSelector.addGoal(17, new CivetIdleGoal(this));
+        this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
                 boolean canWander = !isTame() || isWandering();
                 return canWander && super.canUse();
             }
         });
-        this.goalSelector.addGoal(18, new LookAtPlayerGoal(this, Player.class, 6.0F));
-        this.goalSelector.addGoal(19, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(20, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(21, new RandomLookAroundGoal(this));
 
         this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
@@ -685,7 +688,6 @@ public class CivetEntity extends DiverseCritter {
             }
         }
 
-        // 2. ALIMENTACIÓN (comida de mano del jugador → sube hunger + cura HP)
         boolean isMeatFood = itemstack.is(DoCTags.Items.MEATS) || itemstack.is(ItemTags.FISHES);
         if (isMeatFood && !this.isBaby()) {
             if (this.getHunger() < this.maxHunger() || this.getHealth() < this.getMaxHealth()) {
@@ -724,7 +726,6 @@ public class CivetEntity extends DiverseCritter {
 
     @Override
     public boolean wantsToPickUp(ItemStack pStack) {
-        // Solo recoger carne del suelo - nunca items no-comida
         return pStack.is(DoCTags.Items.MEATS);
     }
 
@@ -735,8 +736,6 @@ public class CivetEntity extends DiverseCritter {
 
     @Override
     public boolean isFood(ItemStack pStack) {
-        // Retornar false para evitar que vanilla maneje la comida (crecimiento, breeding)
-        // Toda la lógica de alimentación se maneja en mobInteract y aiStep
         return false;
     }
 
@@ -745,8 +744,6 @@ public class CivetEntity extends DiverseCritter {
     @Override public int maxThirst() { return 4000; }
     @Override public int maxEnrichment() { return 4000; }
     @Override public int maxHygiene() { return 4000; }
-
-    // Sleep
     @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 25;}
     @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
     @Override protected boolean getDefaultDiurnal() { return true; }

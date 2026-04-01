@@ -89,7 +89,7 @@ public class ScratchLogGoal extends Goal {
         double bestDistSq = Double.MAX_VALUE;
 
         for (int dx = -searchRadius; dx <= searchRadius; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
+            for (int dy = 0; dy <= 2; dy++) {
                 for (int dz = -searchRadius; dz <= searchRadius; dz++) {
                     BlockPos pos = origin.offset(dx, dy, dz);
                     if (isValidLog(pos)) {
