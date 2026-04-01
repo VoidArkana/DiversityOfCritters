@@ -30,8 +30,6 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
-import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
-import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -51,9 +49,7 @@ import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.fluids.FluidType;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Predicate;
 
 public class CivetEntity extends DiverseCritter {
@@ -124,6 +120,9 @@ public class CivetEntity extends DiverseCritter {
     private boolean prevDiggingClient = false;
     private int clientDigTick = 0;
     private int clientDigEndingTick = 0;
+
+    private boolean climbRewardArmed = false;
+    private int climbRewardCooldown = 0;
 
     public boolean isBeingCleaned = false;
 
@@ -375,14 +374,36 @@ public class CivetEntity extends DiverseCritter {
 
         super.aiStep();
 
+        if (!this.level().isClientSide && this.climbRewardCooldown > 0) {
+            this.climbRewardCooldown--;
+        }
+
         Vec3 vec3 = this.getDeltaMovement();
         if (this.isClimbing() && (Math.abs(vec3.y) > 0.1D)) {
             if (!this.level().isClientSide && this.getTicksClimbing() < 3) {
                 this.setTicksClimbing(this.getTicksClimbing()+1);
             }
+
+            if (!this.level().isClientSide && vec3.y > 0.1D) {
+                this.climbRewardArmed = true;
+            }
         } else {
             if (!this.level().isClientSide && this.getTicksClimbing() > 0) {
                 this.setTicksClimbing(this.getTicksClimbing()-1);
+            }
+
+            if (!this.level().isClientSide
+                    && this.climbRewardArmed
+                    && this.onGround()
+                    && !this.isClimbing()
+                    && this.climbRewardCooldown <= 0) {
+                this.setEnrichment(this.maxEnrichment());
+                this.climbRewardArmed = false;
+                this.climbRewardCooldown = 20;
+            }
+
+            if (!this.level().isClientSide && !this.isClimbing() && this.onGround() && vec3.y <= 0.0D) {
+                this.climbRewardArmed = false;
             }
         }
     }
@@ -482,11 +503,8 @@ public class CivetEntity extends DiverseCritter {
         int layEnding   = 20;
         int layTotal    = layStarting + layIdle + layEnding;
 
-        // --- VALIDAMOS SI SE ESTÁ SENTANDO POR ORDEN ---
-        // Usamos el método de la clase base DiverseCritter
         boolean isOrderedSitPlaying = this.isOrderedSitPlaying() && !sleepingLike;
 
-        // --- RESTRINGIMOS LAS VARIANTES ---
         boolean isVariantPlaying = false;
         if (!isOrderedSitPlaying) {
             if (v == IdleVariant.STAND_UP && ticksActive <= 40) isVariantPlaying = true;
@@ -528,7 +546,6 @@ public class CivetEntity extends DiverseCritter {
 
         boolean isDigPlaying  = (isDigStarting || isDigIdle || isDigEnding) && !isOrderedSitPlaying;
 
-        // Añadimos el bloqueo al final para que no haga idle de pie si le mandaste sentarse
         boolean softIdle = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
                 && !doingAttack && !hasTarget
@@ -545,7 +562,6 @@ public class CivetEntity extends DiverseCritter {
         this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT && isVariantPlaying, this.tickCount);
         this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
 
-        // --- SIT ALEATORIO (El Sit Ordenado se calcula y anima en DiverseCritter) ---
         if (v == IdleVariant.SIT && isVariantPlaying) {
             this.idleSitStartingState.animateWhen(ticksActive <= sitStarting, this.tickCount);
             this.idleSitState.animateWhen(ticksActive > sitStarting && ticksActive <= sitStarting + sitIdle, this.tickCount);
@@ -556,7 +572,6 @@ public class CivetEntity extends DiverseCritter {
             this.idleSitEndingState.stop();
         }
 
-        // --- LAY ALEATORIO ---
         if (v == IdleVariant.LAY && isVariantPlaying) {
             this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
             this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);
@@ -617,7 +632,6 @@ public class CivetEntity extends DiverseCritter {
         }
     }
 
-    // --- INTERACTION & EVENTS ---
     @Override
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
         ItemStack itemstack = pPlayer.getItemInHand(pHand);
@@ -840,8 +854,16 @@ public class CivetEntity extends DiverseCritter {
         boolean flag = super.doHurtTarget(pEntity);
         if (flag) {
             this.playSound(SoundEvents.FOX_BITE, 1.0F, 1.0F);
+
+            if (!this.level().isClientSide && isPrey(pEntity) && pEntity instanceof LivingEntity living && living.isDeadOrDying()) {
+                this.setEnrichment(this.maxEnrichment());
+            }
         }
         return flag;
+    }
+
+    private boolean isPrey(Entity entity) {
+        return entity instanceof Rabbit || entity instanceof Chicken;
     }
 
 }
