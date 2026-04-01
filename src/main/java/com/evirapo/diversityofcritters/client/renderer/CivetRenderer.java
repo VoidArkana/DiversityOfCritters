@@ -22,36 +22,34 @@ public class CivetRenderer<T extends CivetEntity> extends MobRenderer<T, Hierarc
     private final HierarchicalModel<T> babyModel;
 
     public CivetRenderer(EntityRendererProvider.Context pContext) {
-        super(pContext, new CivetModel<>(pContext.bakeLayer(ModelLayers.CIVET_LAYER)), 0.20F);
+        super(pContext, new CivetModel<>(pContext.bakeLayer(ModelLayers.CIVET_LAYER)), 0.25F);
         this.adultModel = this.getModel();
         this.babyModel = new CivetBabyModel<>(pContext.bakeLayer(ModelLayers.CIVET_BABY_LAYER));
     }
 
     @Override
     public void render(@NotNull T entity, float entityYaw, float partialTicks, @NotNull PoseStack poseStack, @NotNull MultiBufferSource buffer, int packedLight) {
-
         if (entity.isNewborn()) {
             this.model = this.babyModel;
             this.shadowRadius = 0.15f;
-
-            poseStack.pushPose();
-            poseStack.scale(0.45F, 0.45F, 0.45F);
-
         } else {
             this.model = this.adultModel;
             this.shadowRadius = 0.25f;
-            poseStack.pushPose();
-
-            if (entity.isJuvenile()) {
-                poseStack.scale(0.65F, 0.65F, 0.65F);
-            } else {
-                poseStack.scale(1.0F, 1.0F, 1.0F);
-            }
         }
 
         super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+    }
 
-        poseStack.popPose();
+    @Override
+    protected void scale(@NotNull T entity, PoseStack poseStack, float partialTickTime) {
+        if (entity.isNewborn()) {
+            poseStack.scale(0.45F, 0.45F, 0.45F);
+        } else if (entity.isJuvenile()) {
+            poseStack.scale(0.65F, 0.65F, 0.65F);
+        } else {
+            poseStack.scale(1.0F, 1.0F, 1.0F);
+        }
+        super.scale(entity, poseStack, partialTickTime);
     }
 
     @Override

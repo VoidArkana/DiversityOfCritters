@@ -205,7 +205,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
 		float baseScale = 0.5f;
 		poseStack.scale(baseScale, baseScale, baseScale);
-		poseStack.translate(0, 1.65F, 0);
+		poseStack.translate(0, 1.5F, 0);
 
 		if (this.climbing) {
 			poseStack.mulPose(Axis.XP.rotationDegrees(-90));

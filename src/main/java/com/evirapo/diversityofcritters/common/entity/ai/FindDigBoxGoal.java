@@ -40,7 +40,7 @@ public class FindDigBoxGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (critter.level().isClientSide()) return false;
+        if (critter.level().isClientSide() || critter.isNewborn()) return false;
         if (!critter.isEnrichmentNeeded()) return false;
 
         boxPos = findNearestValidDigBox();
@@ -49,7 +49,7 @@ public class FindDigBoxGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if (critter.level().isClientSide()) return false;
+        if (critter.level().isClientSide() || critter.isNewborn()) return false;
         if (boxPos == null) return false;
 
         if (isFinishing) return finishingTimer < 10;

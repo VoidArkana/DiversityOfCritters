@@ -326,7 +326,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                     this.prevThirst = this.getThirst(); this.setThirst(prevThirst - loss);
                 }
             }
-            if (this.getEnrichment() > 0) {
+            if (this.getEnrichment() > 0 && !this.isNewborn()) {
                 double lossPerTick = getEnrichmentLossPerSecond() / 60.0;
                 enrichmentLossAccum += lossPerTick;
                 if (enrichmentLossAccum >= 1.0) {

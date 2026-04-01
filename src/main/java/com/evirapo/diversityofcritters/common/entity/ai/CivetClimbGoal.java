@@ -7,12 +7,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 
 import java.util.EnumSet;
 
-/**
- * Makes the civet spontaneously seek out climbable surfaces and climb them.
- * Two behavior variants chosen randomly:
- *   CLIMB_TOP  — climbs all the way up and vaults over the edge
- *   CLIMB_HANG — climbs partway up, hangs idle for a while, then lets go
- */
+
 public class CivetClimbGoal extends Goal {
     private final CivetEntity civet;
     private final double speed;
@@ -26,22 +21,17 @@ public class CivetClimbGoal extends Goal {
     private boolean hasClimbedAtAll = false;
     private ClimbBehavior behavior = ClimbBehavior.CLIMB_TOP;
 
-    // HANG sub-state
     private int hangTicksRemaining = 0;
     private int climbTicksBeforeHang = 0;
     private boolean isCurrentlyHanging = false;
 
-    /** Max ticks we'll spend in this goal before giving up */
     private static final int MAX_TICKS = 200;
-    /** Ticks between climb attempts */
-    private static final int COOLDOWN_MIN = 600;  // 30 seconds
-    private static final int COOLDOWN_MAX = 2400; // 2 minutes
-    /** How many ticks to climb before entering hang */
+    private static final int COOLDOWN_MIN = 600;
+    private static final int COOLDOWN_MAX = 2400;
     private static final int HANG_CLIMB_MIN = 15;
     private static final int HANG_CLIMB_MAX = 40;
-    /** How long to hang on the wall */
-    private static final int HANG_DURATION_MIN = 60;  // 3 seconds
-    private static final int HANG_DURATION_MAX = 160; // 8 seconds
+    private static final int HANG_DURATION_MIN = 60;
+    private static final int HANG_DURATION_MAX = 160;
 
     public CivetClimbGoal(CivetEntity civet, double speed, int searchRadius) {
         this.civet = civet;
@@ -52,7 +42,7 @@ public class CivetClimbGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (civet.level().isClientSide() || civet.isNewborn() || civet.isBaby()) return false;
+        if (civet.level().isClientSide() || civet.isNewborn()) return false;
         if (civet.isSleeping() || civet.isOrderedToSit()) return false;
 
         if (this.cooldown > 0) {
@@ -60,7 +50,6 @@ public class CivetClimbGoal extends Goal {
             return false;
         }
 
-        // Random chance (~1/80 per tick when cooldown is 0)
         if (civet.getRandom().nextInt(80) != 0) return false;
 
         this.targetWallPos = findNearestClimbable();
@@ -72,20 +61,17 @@ public class CivetClimbGoal extends Goal {
         if (civet.isSleeping() || civet.isOrderedToSit()) return false;
         if (this.ticksInGoal > MAX_TICKS) return false;
 
-        // For CLIMB_TOP: done when we climbed and landed back on ground (vaulted over)
         if (this.behavior == ClimbBehavior.CLIMB_TOP) {
             if (this.hasClimbedAtAll && !civet.isClimbing() && civet.onGround()) {
                 return false;
             }
         }
 
-        // For CLIMB_HANG: done when hang timer expires and we've fallen back to ground
         if (this.behavior == ClimbBehavior.CLIMB_HANG) {
             if (this.isCurrentlyHanging && this.hangTicksRemaining <= 0) {
                 // Hang time over — release, wait to land
                 return false;
             }
-            // If we were hanging, released, and landed
             if (this.hasClimbedAtAll && !this.isCurrentlyHanging
                     && !civet.isClimbing() && civet.onGround()
                     && this.hangTicksRemaining <= 0) {
@@ -104,7 +90,6 @@ public class CivetClimbGoal extends Goal {
         this.hangTicksRemaining = 0;
         this.climbTicksBeforeHang = 0;
 
-        // 40% chance to hang, 60% to climb all the way
         this.behavior = civet.getRandom().nextFloat() < 0.4f
                 ? ClimbBehavior.CLIMB_HANG
                 : ClimbBehavior.CLIMB_TOP;
@@ -116,7 +101,6 @@ public class CivetClimbGoal extends Goal {
                     + civet.getRandom().nextInt(HANG_DURATION_MAX - HANG_DURATION_MIN);
         }
 
-        // Navigate towards the climbable block
         civet.getNavigation().moveTo(
             targetWallPos.getX() + 0.5,
             targetWallPos.getY(),
@@ -135,75 +119,54 @@ public class CivetClimbGoal extends Goal {
             this.hasClimbedAtAll = true;
         }
 
-        // --- HANG behavior: transition to hanging after climbing a bit ---
         if (this.behavior == ClimbBehavior.CLIMB_HANG && this.hasClimbedAtAll) {
             if (!this.isCurrentlyHanging) {
                 this.climbTicksBeforeHang--;
                 if (this.climbTicksBeforeHang <= 0 && civet.isClimbing()) {
-                    // Transition to hang
                     this.isCurrentlyHanging = true;
                     civet.setClimbState(CivetEntity.CLIMB_HANG);
                     civet.getNavigation().stop();
                     return;
                 }
             } else {
-                // Currently hanging
                 this.hangTicksRemaining--;
                 if (this.hangTicksRemaining <= 0) {
-                    // Release — let go of the wall
                     civet.setClimbState(CivetEntity.CLIMB_NONE);
                     this.isCurrentlyHanging = false;
                     return;
                 }
-                // Keep hanging: ensure state stays HANG and push into wall
                 if (civet.getClimbState() != CivetEntity.CLIMB_HANG) {
                     civet.setClimbState(CivetEntity.CLIMB_HANG);
                 }
-                civet.getMoveControl().setWantedPosition(
-                    targetWallPos.getX() + 0.5,
-                    civet.getY(),
-                    targetWallPos.getZ() + 0.5,
-                    speed * 0.3
-                );
+
+                civet.setDeltaMovement(0, 0, 0);
                 return;
             }
         }
 
-        // --- Normal climbing (both CLIMB_TOP and CLIMB_HANG before hang) ---
-        if (civet.isClimbing() && !this.isCurrentlyHanging) {
-            // On the wall — keep pushing into it with an upward target
-            civet.getMoveControl().setWantedPosition(
-                targetWallPos.getX() + 0.5,
-                civet.getY() + 3.0,
-                targetWallPos.getZ() + 0.5,
-                speed
-            );
-        } else if (!civet.isClimbing() && !this.isCurrentlyHanging) {
-            // Not climbing yet — walk towards the wall
-            double distSq = civet.distanceToSqr(
-                targetWallPos.getX() + 0.5,
-                civet.getY(),
-                targetWallPos.getZ() + 0.5
-            );
+        net.minecraft.world.phys.AABB wallBox = new net.minecraft.world.phys.AABB(targetWallPos);
 
-            if (distSq > 4.0D) {
-                if (!civet.getNavigation().isInProgress()) {
-                    civet.getNavigation().moveTo(
-                        targetWallPos.getX() + 0.5,
-                        targetWallPos.getY(),
-                        targetWallPos.getZ() + 0.5,
-                        speed
-                    );
-                }
-            } else {
-                // Close enough — push into the wall
-                civet.getMoveControl().setWantedPosition(
+        boolean isTouchingWall = civet.getBoundingBox().inflate(0.1D).intersects(wallBox);
+
+        if (!isTouchingWall && !this.hasClimbedAtAll) {
+
+            civet.getLookControl().setLookAt(targetWallPos.getX() + 0.5, targetWallPos.getY() + 0.5, targetWallPos.getZ() + 0.5);
+
+            if (!civet.getNavigation().isInProgress()) {
+                net.minecraft.world.phys.Vec3 civetPos = civet.position();
+                net.minecraft.world.phys.Vec3 targetCenter = new net.minecraft.world.phys.Vec3(targetWallPos.getX() + 0.5, civet.getY(), targetWallPos.getZ() + 0.5);
+
+                net.minecraft.world.phys.Vec3 direction = targetCenter.subtract(civetPos).normalize().scale(0.05D);
+                civet.setDeltaMovement(direction.x, civet.getDeltaMovement().y, direction.z);
+            }
+        } else {
+
+            civet.getMoveControl().setWantedPosition(
                     targetWallPos.getX() + 0.5,
                     civet.getY() + 3.0,
                     targetWallPos.getZ() + 0.5,
                     speed
-                );
-            }
+            );
         }
     }
 
