@@ -109,7 +109,9 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.root().getAllParts().forEach(ModelPart::resetPose);
 
 		boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
-		boolean orderedSit = entity.isOrderedToSit() || (entity.isInSittingPose() && !entity.isWandering());
+
+		// Usamos el nuevo método isOrderedSitPlaying() para abarcar las 3 fases (Start, Idle, End)
+		boolean orderedSitPlaying = entity.isOrderedSitPlaying();
 
 		if (entity.isJuvenile()) {
 			this.Head.xScale = 1.05F;
@@ -132,7 +134,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			return;
 		}
 
-		if (orderedSit) {
+		if (orderedSitPlaying) {
 			limbSwing = 0f;
 			limbSwingAmount = 0f;
 			this.climbing = false;
@@ -140,13 +142,8 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
 			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
 
-			this.animate(entity.sitState, CivetAnims.SIT_IDLE, ageInTicks, 1.0F);
-
-			if (this.young){
-				this.applyStatic(CivetAnims.BABY);
-			}
-
-			return;
+			// HEMOS ELIMINADO EL entity.sitState y el return; AQUÍ.
+			// Ahora el código continuará hacia abajo para leer las 3 nuevas animaciones.
 		}
 
 		if (entity.idleAnimationState.isStarted() && limbSwingAmount <= 0.01f) {
@@ -198,6 +195,10 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		this.animate(entity.drinkStartingState, CivetAnims.DRINK_STARTING, ageInTicks, 1.0F);
 		this.animate(entity.drinkIdleState,     CivetAnims.DRINK_IDLE,     ageInTicks, 1.0F);
 		this.animate(entity.drinkEndingState,   CivetAnims.DRINK_ENDING,   ageInTicks, 1.0F);
+
+		this.animate(entity.orderedSitStartingState, CivetAnims.SIT_STARTING, ageInTicks, 1.0F);
+		this.animate(entity.orderedSitIdleState,     CivetAnims.SIT_IDLE,     ageInTicks, 1.0F);
+		this.animate(entity.orderedSitEndingState,   CivetAnims.SIT_ENDING,   ageInTicks, 1.0F);
 
 		if (this.young){
 			this.applyStatic(CivetAnims.BABY);

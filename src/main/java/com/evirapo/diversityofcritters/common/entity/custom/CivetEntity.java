@@ -465,41 +465,6 @@ public class CivetEntity extends DiverseCritter {
     }
 
     private void setupAnimationStatesClient() {
-        if (this.isOrderedToSit()) {
-            this.idleAnimationState.stop();
-            this.idleStandUpState.stop();
-            this.idleSniffLeftState.stop();
-            this.idleSniffRightState.stop();
-
-            this.idleSitStartingState.stop();
-            this.idleSitState.stop();
-            this.idleSitEndingState.stop();
-
-            this.idleLayStartingState.stop();
-            this.idleLayState.stop();
-            this.idleLayEndingState.stop();
-
-            this.scratchStartingState.stop();
-            this.scratchIdleState.stop();
-            this.scratchEndingState.stop();
-
-            this.cleanStartingState.stop();
-            this.cleanIdleState.stop();
-            this.cleanEndingState.stop();
-
-            this.drinkStartingState.stop();
-            this.drinkIdleState.stop();
-            this.drinkEndingState.stop();
-
-            this.digStartingState.stop();
-            this.digIdleState.stop();
-            this.digEndingState.stop();
-
-            this.climbingUpState.stop();
-            this.attackAnimationState.stop();
-            return;
-        }
-
         boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
         boolean swimming     = this.isInWaterOrBubble();
         boolean climbing     = this.isClimbing();
@@ -519,12 +484,19 @@ public class CivetEntity extends DiverseCritter {
         int layEnding   = 20;
         int layTotal    = layStarting + layIdle + layEnding;
 
+        // --- VALIDAMOS SI SE ESTÁ SENTANDO POR ORDEN ---
+        // Usamos el método de la clase base DiverseCritter
+        boolean isOrderedSitPlaying = this.isOrderedSitPlaying() && !sleepingLike;
+
+        // --- RESTRINGIMOS LAS VARIANTES ---
         boolean isVariantPlaying = false;
-        if (v == IdleVariant.STAND_UP && ticksActive <= 40) isVariantPlaying = true;
-        else if (v == IdleVariant.SNIFF_LEFT && ticksActive <= 40) isVariantPlaying = true;
-        else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
-        else if (v == IdleVariant.SIT && ticksActive <= sitTotal) isVariantPlaying = true;
-        else if (v == IdleVariant.LAY && ticksActive <= layTotal) isVariantPlaying = true;
+        if (!isOrderedSitPlaying) {
+            if (v == IdleVariant.STAND_UP && ticksActive <= 40) isVariantPlaying = true;
+            else if (v == IdleVariant.SNIFF_LEFT && ticksActive <= 40) isVariantPlaying = true;
+            else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
+            else if (v == IdleVariant.SIT && ticksActive <= sitTotal) isVariantPlaying = true;
+            else if (v == IdleVariant.LAY && ticksActive <= layTotal) isVariantPlaying = true;
+        }
 
         boolean scratching = isScratching();
         int scratchActive = this.clientScratchTick;
@@ -533,7 +505,7 @@ public class CivetEntity extends DiverseCritter {
         int scratchEnd   = 10;
         int scratchTotal = scratchStart + scratchLoop + scratchEnd;
 
-        boolean isScratchPlaying = scratching && scratchActive <= scratchTotal;
+        boolean isScratchPlaying = scratching && scratchActive <= scratchTotal && !isOrderedSitPlaying;
 
         boolean cleaning = isCleaning();
         int cleanActive = this.clientCleanTick;
@@ -542,22 +514,23 @@ public class CivetEntity extends DiverseCritter {
         int cleanEnd   = 10;
         int cleanTotal = cleanStart + cleanLoop + cleanEnd;
 
-        boolean isCleanPlaying = cleaning && cleanActive <= cleanTotal;
+        boolean isCleanPlaying = cleaning && cleanActive <= cleanTotal && !isOrderedSitPlaying;
 
         boolean drinking = IsDrinking();
         boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
         boolean isDrinkIdle     = drinking && this.clientDrinkTick > 5;
         boolean isDrinkEnding   = !drinking && this.clientDrinkEndingTick > 0;
 
-        boolean isDrinkPlaying  = isDrinkStarting || isDrinkIdle || isDrinkEnding;
+        boolean isDrinkPlaying  = (isDrinkStarting || isDrinkIdle || isDrinkEnding) && !isOrderedSitPlaying;
 
         boolean digging = isDigging();
         boolean isDigStarting = digging && this.clientDigTick <= 10;
         boolean isDigIdle     = digging && this.clientDigTick > 10;
         boolean isDigEnding   = !digging && this.clientDigEndingTick > 0;
 
-        boolean isDigPlaying  = isDigStarting || isDigIdle || isDigEnding;
+        boolean isDigPlaying  = (isDigStarting || isDigIdle || isDigEnding) && !isOrderedSitPlaying;
 
+        // Añadimos el bloqueo al final para que no haga idle de pie si le mandaste sentarse
         boolean softIdle = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
                 && !doingAttack && !hasTarget
@@ -565,7 +538,8 @@ public class CivetEntity extends DiverseCritter {
                 && !isScratchPlaying
                 && !isCleanPlaying
                 && !isDrinkPlaying
-                && !isDigPlaying;
+                && !isDigPlaying
+                && !isOrderedSitPlaying;
 
         this.idleAnimationState.animateWhen(softIdle, this.tickCount);
 
@@ -573,6 +547,7 @@ public class CivetEntity extends DiverseCritter {
         this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT && isVariantPlaying, this.tickCount);
         this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
 
+        // --- SIT ALEATORIO (El Sit Ordenado se calcula y anima en DiverseCritter) ---
         if (v == IdleVariant.SIT && isVariantPlaying) {
             this.idleSitStartingState.animateWhen(ticksActive <= sitStarting, this.tickCount);
             this.idleSitState.animateWhen(ticksActive > sitStarting && ticksActive <= sitStarting + sitIdle, this.tickCount);
@@ -583,6 +558,7 @@ public class CivetEntity extends DiverseCritter {
             this.idleSitEndingState.stop();
         }
 
+        // --- LAY ALEATORIO ---
         if (v == IdleVariant.LAY && isVariantPlaying) {
             this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
             this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);

@@ -94,7 +94,14 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public final AnimationState preparingSleepState = new AnimationState();
     public final AnimationState sleepState = new AnimationState();
     public final AnimationState awakeningState = new AnimationState();
-    public final AnimationState sitState = new AnimationState();
+
+    public final AnimationState orderedSitStartingState = new AnimationState();
+    public final AnimationState orderedSitIdleState = new AnimationState();
+    public final AnimationState orderedSitEndingState = new AnimationState();
+
+    private boolean prevOrderedSitClient = false;
+    public int clientOrderedSitTick = 0;
+    public int clientOrderedSitEndingTick = 0;
 
     private SleepState prevSleepState = SleepState.AWAKE;
 
@@ -120,6 +127,13 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public int getPreparingSleepDuration() { return 40; }
     public int getAwakeningDuration() { return 40; }
     protected boolean getDefaultDiurnal() { return true; }
+
+    public int getOrderedSitStartingDuration() { return 10; }
+    public int getOrderedSitEndingDuration() { return 20; }
+
+    public boolean isOrderedSitPlaying() {
+        return prevOrderedSitClient || clientOrderedSitEndingTick > 0;
+    }
 
     // --- SYNC & DATA ---
     @Override
@@ -272,6 +286,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private Integer fixAgeOnFirstTick = null;
 
     // --- MAIN TICK ---
+    // --- MAIN TICK ---
     @Override
     public void tick() {
         if (!this.level().isClientSide && this.fixAgeOnFirstTick != null) {
@@ -294,8 +309,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 }
             }
 
+            // --- REBALANCEO GLOBAL: Estadísticas 3 veces más lentas (dividiendo entre 60.0 en lugar de 20.0) ---
             if (this.getHunger() > 0) {
-                double lossPerTick = getHungerLossPerSecond() / 20.0;
+                double lossPerTick = getHungerLossPerSecond() / 60.0;
                 hungerLossAccum += lossPerTick;
                 if (hungerLossAccum >= 1.0) {
                     int loss = (int) hungerLossAccum; hungerLossAccum -= loss;
@@ -303,7 +319,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 }
             }
             if (this.getThirst() > 0) {
-                double lossPerTick = getThirstLossPerSecond() / 20.0;
+                double lossPerTick = getThirstLossPerSecond() / 60.0;
                 thirstLossAccum += lossPerTick;
                 if (thirstLossAccum >= 1.0) {
                     int loss = (int) thirstLossAccum; thirstLossAccum -= loss;
@@ -311,7 +327,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 }
             }
             if (this.getEnrichment() > 0) {
-                double lossPerTick = getEnrichmentLossPerSecond() / 20.0;
+                double lossPerTick = getEnrichmentLossPerSecond() / 60.0;
                 enrichmentLossAccum += lossPerTick;
                 if (enrichmentLossAccum >= 1.0) {
                     int loss = (int) enrichmentLossAccum; enrichmentLossAccum -= loss;
@@ -319,13 +335,14 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 }
             }
             if (this.getHygiene() > 0) {
-                double lossPerTick = getHygieneLossPerSecond() / 20.0;
+                double lossPerTick = getHygieneLossPerSecond() / 60.0;
                 hygieneLossAccum += lossPerTick;
                 if (hygieneLossAccum >= 1.0) {
                     int loss = (int) hygieneLossAccum; hygieneLossAccum -= loss;
                     this.setHygiene(this.getHygiene() - loss);
                 }
             }
+
             if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){ this.starve(); }
         }
 
@@ -379,21 +396,50 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     protected void updateSitAnimationClient() {
         if (this.getSleepState() != SleepState.AWAKE) {
-            if (sitState.isStarted()) sitState.stop();
+            orderedSitStartingState.stop();
+            orderedSitIdleState.stop();
+            orderedSitEndingState.stop();
             return;
         }
 
         boolean isOrdered = this.isOrderedToSit();
         boolean inPose = this.isInSittingPose();
         boolean wandering = this.isWandering();
-        boolean isStarted = sitState.isStarted();
 
         boolean shouldSit = isOrdered || (inPose && !wandering);
 
-        if (shouldSit && !isStarted) {
-            sitState.start(this.tickCount);
-        } else if (!shouldSit && isStarted) {
-            sitState.stop();
+        // --- CONTADOR DINÁMICO DE SIT POR ORDEN ---
+        if (shouldSit && !prevOrderedSitClient) {
+            this.clientOrderedSitTick = 0;
+            this.clientOrderedSitEndingTick = 0;
+        } else if (!shouldSit && prevOrderedSitClient) {
+            this.clientOrderedSitEndingTick = 1;
+            this.clientOrderedSitTick = 0;
+        }
+
+        if (shouldSit) {
+            this.clientOrderedSitTick++;
+        } else if (this.clientOrderedSitEndingTick > 0) {
+            this.clientOrderedSitEndingTick++;
+            if (this.clientOrderedSitEndingTick > getOrderedSitEndingDuration() + 1) {
+                this.clientOrderedSitEndingTick = 0;
+            }
+        }
+        this.prevOrderedSitClient = shouldSit;
+
+        // --- MÁQUINA DE ESTADOS ---
+        boolean isStarting = shouldSit && this.clientOrderedSitTick <= getOrderedSitStartingDuration();
+        boolean isIdle     = shouldSit && this.clientOrderedSitTick > getOrderedSitStartingDuration();
+        boolean isEnding   = !shouldSit && this.clientOrderedSitEndingTick > 0;
+
+        if (isStarting || isIdle || isEnding) {
+            this.orderedSitStartingState.animateWhen(isStarting, this.tickCount);
+            this.orderedSitIdleState.animateWhen(isIdle, this.tickCount);
+            this.orderedSitEndingState.animateWhen(isEnding, this.tickCount);
+        } else {
+            this.orderedSitStartingState.stop();
+            this.orderedSitIdleState.stop();
+            this.orderedSitEndingState.stop();
         }
     }
 
