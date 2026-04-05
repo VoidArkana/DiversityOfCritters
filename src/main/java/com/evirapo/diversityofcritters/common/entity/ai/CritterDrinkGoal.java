@@ -39,7 +39,8 @@ public class CritterDrinkGoal extends Goal {
     @Override
     public boolean canUse() {
         if (critter.isNewborn() || critter.level().isClientSide()) return false;
-        if (critter.getThirst() >= critter.maxThirst()) return false;
+        if (!critter.isThirsty()) return false;
+
         if (critter.getRandom().nextFloat() >= DRINK_CHANCE) return false;
 
         waterPos = generateTarget();

@@ -134,6 +134,7 @@ public class CivetEntity extends DiverseCritter {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
         this.moveControl = new CivetMoveControl(this);
+        this.idleAnimationState.start(0);
     }
 
     // --- SETUP ---

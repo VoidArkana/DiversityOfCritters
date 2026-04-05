@@ -141,7 +141,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
 		}
 
-		if (entity.idleAnimationState.isStarted() && limbSwingAmount <= 0.01f) {
+		if (entity.idleAnimationState.isStarted() || limbSwingAmount > 0.01f) {
 			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
 			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
 		}
@@ -156,9 +156,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			if (entity.isInWaterOrBubble()){
 				this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
 			} else {
-				if (limbSwingAmount > 0.01f) {
-					this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
-				}
+				this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
 
 				this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
 
