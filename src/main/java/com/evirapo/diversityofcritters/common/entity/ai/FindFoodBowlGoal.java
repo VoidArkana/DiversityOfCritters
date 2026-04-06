@@ -19,6 +19,7 @@ public class FindFoodBowlGoal extends Goal {
 
     private BlockPos bowlPos;
     private int eatTimer = 0;
+    private int cooldown = 0;
     private static final int EAT_INTERVAL = 40;
 
     private static final double MAX_EAT_DIST_SQ = 2.8D;
@@ -32,6 +33,10 @@ public class FindFoodBowlGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (cooldown > 0) {
+            cooldown--;
+            return false;
+        }
         if (critter.isNewborn()) return false;
         if (critter.level().isClientSide()) return false;
         if (!critter.isHungry()) return false;
@@ -73,13 +78,13 @@ public class FindFoodBowlGoal extends Goal {
     public void tick() {
         if (bowlPos == null) return;
 
-        Vec3 bowlCenter = Vec3.atCenterOf(bowlPos);
-        double distSq = critter.distanceToSqr(bowlCenter);
+        boolean isCloseEnough = critter.getBoundingBox().inflate(0.32D).intersects(new net.minecraft.world.phys.AABB(bowlPos));
+        Vec3 bowlCenter = Vec3.atBottomCenterOf(bowlPos);
 
-        if (distSq > MAX_EAT_DIST_SQ) {
+        if (!isCloseEnough) {
             critter.setIsDrinking(false);
             if (!critter.getNavigation().isInProgress()) {
-                critter.getNavigation().moveTo(bowlCenter.x, bowlCenter.y, bowlCenter.z, speed);
+                critter.getNavigation().moveTo(bowlCenter.x, bowlPos.getY(), bowlCenter.z, speed);
             }
             return;
         }
@@ -91,10 +96,19 @@ public class FindFoodBowlGoal extends Goal {
         critter.setDeltaMovement(0, dm.y, 0);
 
         critter.getLookControl().setLookAt(
-                bowlCenter.x, bowlCenter.y + 0.1D, bowlCenter.z
+                bowlCenter.x, bowlPos.getY() + 0.1D, bowlCenter.z
         );
 
         eatTimer++;
+        
+        boolean hasFood = BowlFeedingHelper.hasFoodFor(critter, (Level) critter.level(), bowlPos);
+        if (!hasFood) {
+            critter.setIsDrinking(false);
+            this.cooldown = 100;
+            this.stop();
+            return;
+        }
+
         if (eatTimer % EAT_INTERVAL == 0) {
             boolean ate = BowlFeedingHelper.consumeFoodFor(critter, (Level) critter.level(), bowlPos);
             if (!ate || critter.getHunger() >= critter.maxHunger()) {

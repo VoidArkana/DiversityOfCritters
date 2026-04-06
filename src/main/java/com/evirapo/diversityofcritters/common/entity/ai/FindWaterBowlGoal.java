@@ -18,12 +18,10 @@ public class FindWaterBowlGoal extends Goal {
 
     private BlockPos bowlPos;
     private int drinkTimer = 0;
+    private int cooldown = 0;
 
     private boolean isFinishing = false;
     private int finishingTimer = 0;
-
-    // Cambiamos a 1.8D. Matemáticamente esto es pararse pegadito a la hitbox del bloque
-    private static final double MAX_DRINK_DIST_SQ = 1.8D;
 
     public FindWaterBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -34,6 +32,10 @@ public class FindWaterBowlGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (cooldown > 0) {
+            cooldown--;
+            return false;
+        }
         if (critter.isNewborn()) return false;
         if (critter.level().isClientSide()) return false;
         if (!critter.isThirsty()) return false;
@@ -88,18 +90,16 @@ public class FindWaterBowlGoal extends Goal {
 
         if (bowlPos == null) return;
 
-        Vec3 bowlCenter = Vec3.atCenterOf(bowlPos);
-        double distSq = critter.distanceToSqr(bowlCenter);
+        boolean isCloseEnough = critter.getBoundingBox().inflate(0.32D).intersects(new net.minecraft.world.phys.AABB(bowlPos));
+        Vec3 bowlCenter = Vec3.atBottomCenterOf(bowlPos);
 
-        if (distSq > MAX_DRINK_DIST_SQ) {
+        if (!isCloseEnough) {
             critter.setIsDrinking(false);
             critter.setDrinkPos(null);
 
-            // CORRECCIÓN: Solo recalcular si NO está ya en movimiento hacia allí
             if (!critter.getNavigation().isInProgress()) {
-                critter.getNavigation().moveTo(bowlCenter.x, bowlCenter.y, bowlCenter.z, speed);
+                critter.getNavigation().moveTo(bowlCenter.x, bowlPos.getY(), bowlCenter.z, speed);
             }
-
             return;
         }
 
@@ -114,16 +114,28 @@ public class FindWaterBowlGoal extends Goal {
 
         drinkTimer++;
 
+        boolean hasWater = BowlFeedingHelper.hasWaterFor((Level) critter.level(), bowlPos);
+        if (!hasWater) {
+            critter.setIsDrinking(false);
+            this.cooldown = 100;
+            this.stop();
+            return;
+        }
+
         if (drinkTimer >= 5 && (drinkTimer - 5) % 20 == 10) {
             BowlFeedingHelper.consumeWaterFor(critter, (Level) critter.level(), bowlPos);
         }
 
         if (drinkTimer >= 5 && (drinkTimer - 5) % 20 == 0) {
-            boolean hasWater = BowlFeedingHelper.hasWaterFor((Level) critter.level(), bowlPos);
-            if (!hasWater || critter.getThirst() >= critter.maxThirst()) {
+            if (!hasWater) {
                 critter.setIsDrinking(false);
                 isFinishing = true;
             }
+        }
+
+        if (critter.getThirst() >= critter.maxThirst()) {
+            critter.setIsDrinking(false);
+            isFinishing = true;
         }
     }
 

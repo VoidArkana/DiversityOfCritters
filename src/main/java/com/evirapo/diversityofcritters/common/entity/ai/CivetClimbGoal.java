@@ -146,7 +146,7 @@ public class CivetClimbGoal extends Goal {
 
         net.minecraft.world.phys.AABB wallBox = new net.minecraft.world.phys.AABB(targetWallPos);
 
-        boolean isTouchingWall = civet.getBoundingBox().inflate(0.1D).intersects(wallBox);
+        boolean isTouchingWall = civet.getBoundingBox().inflate(0.2D).intersects(wallBox);
 
         if (!isTouchingWall && !this.hasClimbedAtAll) {
 
@@ -156,7 +156,7 @@ public class CivetClimbGoal extends Goal {
                 net.minecraft.world.phys.Vec3 civetPos = civet.position();
                 net.minecraft.world.phys.Vec3 targetCenter = new net.minecraft.world.phys.Vec3(targetWallPos.getX() + 0.5, civet.getY(), targetWallPos.getZ() + 0.5);
 
-                net.minecraft.world.phys.Vec3 direction = targetCenter.subtract(civetPos).normalize().scale(0.05D);
+                net.minecraft.world.phys.Vec3 direction = targetCenter.subtract(civetPos).normalize().scale(0.06D);
                 civet.setDeltaMovement(direction.x, civet.getDeltaMovement().y, direction.z);
             }
         } else {
