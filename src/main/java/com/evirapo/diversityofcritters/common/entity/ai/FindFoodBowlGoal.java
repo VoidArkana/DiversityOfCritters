@@ -24,6 +24,9 @@ public class FindFoodBowlGoal extends Goal {
 
     private static final double MAX_EAT_DIST_SQ = 2.8D;
 
+    private int navigationRetryTimer = 0;
+    private static final int NAV_RETRY_INTERVAL = 40;
+
     public FindFoodBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
         this.speed = speed;
@@ -59,6 +62,7 @@ public class FindFoodBowlGoal extends Goal {
     @Override
     public void start() {
         eatTimer = 0;
+        navigationRetryTimer = 0;
         critter.setIsDrinking(false);
         if (bowlPos != null) {
             Vec3 center = Vec3.atCenterOf(bowlPos);
@@ -83,7 +87,13 @@ public class FindFoodBowlGoal extends Goal {
 
         if (!isCloseEnough) {
             critter.setIsDrinking(false);
-            if (!critter.getNavigation().isInProgress()) {
+            // Retry navigation periodically — the path may have been cancelled
+            // by stuck detection or failed the first time (e.g. civet was on
+            // an elevated surface and the path needed to be rescheduled once
+            // the entity started moving toward the wall).
+            navigationRetryTimer++;
+            if (!critter.getNavigation().isInProgress() || navigationRetryTimer >= NAV_RETRY_INTERVAL) {
+                navigationRetryTimer = 0;
                 critter.getNavigation().moveTo(bowlCenter.x, bowlPos.getY(), bowlCenter.z, speed);
             }
             return;
@@ -118,6 +128,11 @@ public class FindFoodBowlGoal extends Goal {
     }
 
     @Nullable
+    public BlockPos getBowlPos() {
+        return this.bowlPos;
+    }
+
+    @Nullable
     private BlockPos findNearestFoodBowl() {
         Level level = (Level) critter.level();
         BlockPos origin = critter.blockPosition();
@@ -126,7 +141,12 @@ public class FindFoodBowlGoal extends Goal {
         double bestDistSq = Double.MAX_VALUE;
 
         int r = this.searchRadius;
-        for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-r, -2, -r), origin.offset(r, 2, r))) {
+        // Use full vertical range so civets on elevated surfaces (e.g. top of
+        // a climbable log) can still detect bowls on the ground below them.
+        int verticalRange = r;
+        for (BlockPos pos : BlockPos.betweenClosed(
+                origin.offset(-r, -verticalRange, -r),
+                origin.offset(r,  verticalRange, r))) {
             if (BowlFeedingHelper.hasFoodFor(critter, level, pos)) {
                 double distSq = origin.distSqr(pos);
                 if (distSq < bestDistSq) {

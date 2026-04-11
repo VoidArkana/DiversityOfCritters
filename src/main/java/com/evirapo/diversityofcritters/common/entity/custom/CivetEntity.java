@@ -414,6 +414,17 @@ public class CivetEntity extends DiverseCritter {
         return false;
     }
 
+    /**
+     * Override fall distance so the WalkNodeEvaluator does not mark positions
+     * next to climbable walls as BLOCKED due to fall-distance checks.
+     * Without this, any wall node more than 3 blocks high gets rejected by
+     * the pathfinder before CivetNodeEvaluator can even evaluate it.
+     */
+    @Override
+    public int getMaxFallDistance() {
+        return this.hasAdjacentClimbableBlock() ? 16 : super.getMaxFallDistance();
+    }
+
     @Override
     public void jumpInFluid(FluidType type) {
         self().setDeltaMovement(self().getDeltaMovement().add(0.0D, 0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/3, 0.0D));
@@ -752,33 +763,54 @@ public class CivetEntity extends DiverseCritter {
     }
 
     private void updateClimbState() {
-        boolean touchingWall = this.horizontalCollision;
         boolean hasClimbable = this.hasAdjacentClimbableBlock();
         byte currentState = this.getClimbState();
 
+        // --- HANG: managed externally by CivetClimbGoal ---
         if (currentState == CLIMB_HANG) {
             if (!hasClimbable) {
                 this.setClimbState(CLIMB_NONE);
             } else {
+                this.updateClimbFacingYaw();
                 this.lockClimbRotation();
             }
             return;
         }
 
-        if (touchingWall && hasClimbable && !this.isScratching() && !this.isNewborn()) {
+        // --- CLIMB_UP ---
+        if (currentState == CLIMB_UP) {
+            if (!hasClimbable && !this.onGround()) {
+                // Reached the top of the wall: small hop onto the surface
+                float yawRad = this.getYRot() * ((float) Math.PI / 180F);
+                this.setDeltaMovement(-Math.sin(yawRad) * 0.25D, 0.4D, Math.cos(yawRad) * 0.25D);
+                this.setClimbState(CLIMB_NONE);
+            } else if (this.onGround() && !hasClimbable) {
+                this.setClimbState(CLIMB_NONE);
+            } else {
+                this.updateClimbFacingYaw();
+                this.lockClimbRotation();
+            }
+            return;
+        }
+
+        // --- CLIMB_DOWN ---
+        if (currentState == CLIMB_DOWN) {
+            if (this.onGround() || !hasClimbable) {
+                this.setClimbState(CLIMB_NONE);
+            } else {
+                this.updateClimbFacingYaw();
+                this.lockClimbRotation();
+            }
+            return;
+        }
+
+        // --- CLIMB_NONE: MoveControl drives CLIMB_UP/DOWN via updateClimbDirectionFromPath.
+        // Fallback: if the entity collides with a wall that has a climbable block
+        // but the path hasn't set a climb state yet, default to CLIMB_UP.
+        if (this.horizontalCollision && hasClimbable && !this.isScratching() && !this.isNewborn()) {
             this.setClimbState(CLIMB_UP);
             this.updateClimbFacingYaw();
             this.lockClimbRotation();
-        } else if (currentState == CLIMB_UP && !hasClimbable && !this.onGround()) {
-            float yawRad = this.getYRot() * ((float) Math.PI / 180F);
-            double boostX = -Math.sin(yawRad) * 0.25D;
-            double boostZ =  Math.cos(yawRad) * 0.25D;
-            this.setDeltaMovement(boostX, 0.4D, boostZ);
-            this.setClimbState(CLIMB_NONE);
-        } else if (currentState != CLIMB_NONE) {
-            if (this.onGround() || !hasClimbable) {
-                this.setClimbState(CLIMB_NONE);
-            }
         }
     }
 
