@@ -35,6 +35,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	private final ModelPart Leg3;
 
 	public boolean climbing = false;
+	public boolean climbingDown = false;
 
 	public CivetModel(ModelPart root) {
 		this.BandedPlamCivet = root.getChild("BandedPlamCivet");
@@ -147,6 +148,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		}
 
 		this.climbing = entity.isClimbing();
+		this.climbingDown = entity.isClimbingDown();
 
 		if (entity.isClimbing()){
 			this.animate(entity.climbingUpState,   CivetAnims.CLIMBING_UP,   ageInTicks, 1.0F);
@@ -206,8 +208,15 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		poseStack.translate(0, 1.5F, 0);
 
 		if (this.climbing) {
-			poseStack.mulPose(Axis.XP.rotationDegrees(-90));
-			poseStack.translate(0, -0.4f, 0.25f);
+			if (this.climbingDown) {
+				// Descending: rotate +90° so the head points downward along the wall
+				poseStack.mulPose(Axis.XP.rotationDegrees(90));
+				poseStack.translate(0, -0.4f, -0.25f);
+			} else {
+				// Ascending or hanging: rotate -90° so the head points upward
+				poseStack.mulPose(Axis.XP.rotationDegrees(-90));
+				poseStack.translate(0, -0.4f, 0.25f);
+			}
 		}
 
 		BandedPlamCivet.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);

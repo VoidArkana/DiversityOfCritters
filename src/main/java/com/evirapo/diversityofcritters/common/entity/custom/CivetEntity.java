@@ -128,6 +128,11 @@ public class CivetEntity extends DiverseCritter {
     private boolean climbRewardArmed = false;
     private int climbRewardCooldown = 0;
 
+    // Ticks to keep CLIMB_DOWN active even if hasAdjacentClimbableBlock
+    // returns false momentarily (e.g. between two log blocks in a column).
+    private int climbDownProtectionTicks = 0;
+    private static final int CLIMB_DOWN_PROTECTION = 8;
+
     public boolean isBeingCleaned = false;
 
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
@@ -152,7 +157,8 @@ public class CivetEntity extends DiverseCritter {
         return Mob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 10.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.2D)
-                .add(Attributes.ATTACK_DAMAGE, 2.0D);
+                .add(Attributes.ATTACK_DAMAGE, 2.0D)
+                .add(Attributes.FOLLOW_RANGE, 6.0D); // Minimal range to keep PathNavigationRegion small and avoid server freeze
     }
 
     protected PathNavigation createNavigation(Level pLevel) {
@@ -227,7 +233,15 @@ public class CivetEntity extends DiverseCritter {
 
     @Override
     public void tick() {
+        __adjacentCallsThisTick = 0; // reset per-tick counter
+        long __t0 = System.nanoTime();
         super.tick();
+        long __ms = (System.nanoTime() - __t0) / 1_000_000;
+        if (__ms >= 10) {
+            com.mojang.logging.LogUtils.getLogger().warn(
+                "[CivetTick][PERF] tick() took {}ms entity={} onGround={} climbing={} climbState={}",
+                __ms, this.getId(), this.onGround(), this.isClimbing(), this.getClimbState());
+        }
 
         if (!this.level().isClientSide) {
             this.updateClimbState();
@@ -354,6 +368,7 @@ public class CivetEntity extends DiverseCritter {
 
     @Override
     public void aiStep() {
+        long __ai0 = System.nanoTime();
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
 
         if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS) && !this.isNewborn()) {
@@ -393,10 +408,18 @@ public class CivetEntity extends DiverseCritter {
                 this.climbRewardCooldown = 20;
             }
         }
+
+        long __aiMs = (System.nanoTime() - __ai0) / 1_000_000;
+        if (__aiMs >= 5) {
+            com.mojang.logging.LogUtils.getLogger().warn(
+                "[CivetAI][PERF] aiStep took {}ms entity={} onGround={} climbing={}",
+                __aiMs, this.getId(), this.onGround(), this.isClimbing());
+        }
     }
 
     @Override
     public void customServerAiStep() {
+        long __t = System.nanoTime();
         if (this.getMoveControl().hasWanted()) {
             double d0 = this.getMoveControl().getSpeedModifier();
             this.setPose(Pose.STANDING);
@@ -404,6 +427,12 @@ public class CivetEntity extends DiverseCritter {
         } else {
             this.setPose(Pose.STANDING);
             this.setSprinting(false);
+        }
+        long __ms = (System.nanoTime() - __t) / 1_000_000;
+        if (__ms >= 5) {
+            com.mojang.logging.LogUtils.getLogger().warn(
+                "[CivetAI][PERF] customServerAiStep took {}ms entity={}",
+                __ms, this.getId());
         }
     }
 
@@ -696,7 +725,14 @@ public class CivetEntity extends DiverseCritter {
 
     // --- CLIMB STATE ---
     public byte getClimbState() { return this.entityData.get(CLIMB_STATE); }
-    public void setClimbState(byte state) { this.entityData.set(CLIMB_STATE, state); }
+    public void setClimbState(byte state) {
+        this.entityData.set(CLIMB_STATE, state);
+        if (state == CLIMB_DOWN) {
+            this.climbDownProtectionTicks = CLIMB_DOWN_PROTECTION;
+        } else if (state == CLIMB_NONE) {
+            this.climbDownProtectionTicks = 0;
+        }
+    }
     public boolean isClimbing() { return getClimbState() != CLIMB_NONE; }
     public boolean isClimbingUp() { return getClimbState() == CLIMB_UP; }
     public boolean isClimbingDown() { return getClimbState() == CLIMB_DOWN; }
@@ -705,7 +741,19 @@ public class CivetEntity extends DiverseCritter {
     @Override
     public boolean onClimbable() { return isClimbing(); }
 
+    private int __adjacentCallsThisTick = 0;
+
     public boolean hasAdjacentClimbableBlock() {
+        __adjacentCallsThisTick++;
+        if (__adjacentCallsThisTick > 5 && this.tickCount % 20 == 0) {
+            com.mojang.logging.LogUtils.getLogger().warn(
+                "[CivetTick][PERF] hasAdjacentClimbableBlock called {} times this tick! entity={}",
+                __adjacentCallsThisTick, this.getId());
+        }
+        return hasAdjacentClimbableBlockInternal();
+    }
+
+    private boolean hasAdjacentClimbableBlockInternal() {
         AABB box = this.getBoundingBox();
         double probeDistance = 0.3D;
         int footY = Mth.floor(box.minY);
@@ -724,11 +772,16 @@ public class CivetEntity extends DiverseCritter {
         };
 
         for (int[] off : offsets) {
-            BlockPos posFoot = new BlockPos(off[0], footY, off[1]);
-            BlockPos posEye  = new BlockPos(off[0], eyeY,  off[1]);
-            if (this.level().getBlockState(posFoot).is(DoCTags.Blocks.CIVET_CLIMBABLE)
-             || this.level().getBlockState(posEye).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
-                return true;
+            // Check at foot level, eye level, and one below foot
+            // (needed when the mob is in the step-off position beside a column
+            // whose climbable blocks are one block below the mob's feet)
+            for (int dy : new int[]{0, -1}) {
+                BlockPos posFoot = new BlockPos(off[0], footY + dy, off[1]);
+                BlockPos posEye  = new BlockPos(off[0], eyeY  + dy, off[1]);
+                if (this.level().getBlockState(posFoot).is(DoCTags.Blocks.CIVET_CLIMBABLE)
+                 || this.level().getBlockState(posEye).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                    return true;
+                }
             }
         }
         return false;
@@ -766,10 +819,10 @@ public class CivetEntity extends DiverseCritter {
         boolean hasClimbable = this.hasAdjacentClimbableBlock();
         byte currentState = this.getClimbState();
 
-        // --- HANG: managed externally by CivetClimbGoal ---
+        // --- HANG ---
         if (currentState == CLIMB_HANG) {
             if (!hasClimbable) {
-                this.setClimbState(CLIMB_NONE);
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else {
                 this.updateClimbFacingYaw();
                 this.lockClimbRotation();
@@ -780,12 +833,11 @@ public class CivetEntity extends DiverseCritter {
         // --- CLIMB_UP ---
         if (currentState == CLIMB_UP) {
             if (!hasClimbable && !this.onGround()) {
-                // Reached the top of the wall: small hop onto the surface
                 float yawRad = this.getYRot() * ((float) Math.PI / 180F);
                 this.setDeltaMovement(-Math.sin(yawRad) * 0.25D, 0.4D, Math.cos(yawRad) * 0.25D);
-                this.setClimbState(CLIMB_NONE);
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else if (this.onGround() && !hasClimbable) {
-                this.setClimbState(CLIMB_NONE);
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else {
                 this.updateClimbFacingYaw();
                 this.lockClimbRotation();
@@ -795,18 +847,31 @@ public class CivetEntity extends DiverseCritter {
 
         // --- CLIMB_DOWN ---
         if (currentState == CLIMB_DOWN) {
-            if (this.onGround() || !hasClimbable) {
-                this.setClimbState(CLIMB_NONE);
-            } else {
+            // Always clear if on the ground, regardless of protection timer
+            if (this.onGround()) {
+                this.climbDownProtectionTicks = 0;
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+                return;
+            }
+            if (this.climbDownProtectionTicks > 0) {
+                // Grace period: keep climbing even if probe temporarily misses
+                this.climbDownProtectionTicks--;
                 this.updateClimbFacingYaw();
                 this.lockClimbRotation();
+                return;
             }
+            // Refresh protection ticks whenever we can still detect the wall
+            if (hasClimbable) {
+                this.climbDownProtectionTicks = CLIMB_DOWN_PROTECTION;
+            }
+            this.updateClimbFacingYaw();
+            this.lockClimbRotation();
             return;
         }
 
-        // --- CLIMB_NONE: MoveControl drives CLIMB_UP/DOWN via updateClimbDirectionFromPath.
-        // Fallback: if the entity collides with a wall that has a climbable block
-        // but the path hasn't set a climb state yet, default to CLIMB_UP.
+        // --- CLIMB_NONE fallback ---
+        // Only activate CLIMB_UP via horizontal collision if we are not
+        // already in a descent path (which is managed by MoveControl).
         if (this.horizontalCollision && hasClimbable && !this.isScratching() && !this.isNewborn()) {
             this.setClimbState(CLIMB_UP);
             this.updateClimbFacingYaw();

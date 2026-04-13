@@ -7,7 +7,6 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.AABB;
@@ -15,16 +14,6 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
-/**
- * Debug command: /civet_debug
- * Run while looking at or standing near a CivetEntity.
- * Prints a full diagnostic snapshot to chat:
- *   - Entity state (onGround, climbing, climbState, hasAdjacentClimbable)
- *   - Active path (node count, current index, next 5 nodes with Y deltas)
- *   - Navigation state (isDone, canUpdatePath equivalent)
- *   - MoveControl wanted position
- *   - Goal selector top active goals
- */
 public class CivetDebugCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -37,7 +26,6 @@ public class CivetDebugCommand {
     private static int run(CommandSourceStack source) {
         Vec3 pos = source.getPosition();
 
-        // Find the nearest CivetEntity within 10 blocks
         List<CivetEntity> civets = source.getLevel().getEntitiesOfClass(
                 CivetEntity.class,
                 new AABB(pos.x - 10, pos.y - 10, pos.z - 10,
@@ -45,11 +33,10 @@ public class CivetDebugCommand {
         );
 
         if (civets.isEmpty()) {
-            source.sendFailure(Component.literal("[CivetDebug] No CivetEntity found within 10 blocks."));
+            source.sendFailure(Component.literal("[CivetDebug] No CivetEntity within 10 blocks."));
             return 0;
         }
 
-        // Pick the closest one
         CivetEntity civet = civets.stream()
                 .min((a, b) -> Double.compare(a.distanceToSqr(pos.x, pos.y, pos.z),
                                               b.distanceToSqr(pos.x, pos.y, pos.z)))
@@ -57,114 +44,110 @@ public class CivetDebugCommand {
 
         send(source, "§e=== CIVET DEBUG [" + civet.getId() + "] ===");
 
-        // --- Entity state ---
+        // --- POSITION & PHYSICS ---
         send(source, "§bPOS: " + fmt(civet.getX()) + " " + fmt(civet.getY()) + " " + fmt(civet.getZ()));
-        send(source, "§bonGround: " + civet.onGround()
-                + "  horizontalCollision: " + civet.horizontalCollision
-                + "  verticalCollision: " + civet.verticalCollision);
-        send(source, "§bclimbState: " + climbStateName(civet.getClimbState())
-                + "  isClimbing: " + civet.isClimbing()
-                + "  hasAdjacentClimbable: " + civet.hasAdjacentClimbableBlock());
+        Vec3 vel = civet.getDeltaMovement();
+        send(source, "§bVEL: dx=" + fmt(vel.x) + " dy=" + fmt(vel.y) + " dz=" + fmt(vel.z));
+        send(source, "§bonGround=" + civet.onGround()
+                + "  hCollision=" + civet.horizontalCollision
+                + "  vCollision=" + civet.verticalCollision);
 
-        // Block directly below
+        // Block below
         BlockPos below = civet.blockPosition().below();
         String belowBlock = source.getLevel().getBlockState(below).getBlock().getDescriptionId();
         send(source, "§bblockBelow: " + belowBlock + " @ " + below);
 
-        // --- Navigation state ---
-        Path path = civet.getNavigation().getPath();
-        boolean navDone = civet.getNavigation().isDone();
-        send(source, "§anav.isDone: " + navDone);
+        // --- CLIMB STATE ---
+        send(source, "§dclimbState: " + climbStateName(civet.getClimbState())
+                + "  isClimbing=" + civet.isClimbing()
+                + "  isClimbingDown=" + civet.isClimbingDown()
+                + "  isHanging=" + civet.isHanging());
+        send(source, "§dhasAdjacentClimbable=" + civet.hasAdjacentClimbableBlock());
 
-        // Simulate canUpdatePath check
-        boolean canUpdate = civet.isClimbing() || civet.onGround();
-        send(source, "§acanUpdatePath (simulated): " + canUpdate
-                + " (climbing=" + civet.isClimbing() + " onGround=" + civet.onGround() + ")");
+        // Check each probe direction manually for detail
+        AABB box = civet.getBoundingBox();
+        double probeDistance = 0.3D;
+        int footY = net.minecraft.util.Mth.floor(box.minY);
+        double cx = (box.minX + box.maxX) * 0.5;
+        double cz = (box.minZ + box.maxZ) * 0.5;
+        double halfW = (box.maxX - box.minX) * 0.5;
+        double halfD = (box.maxZ - box.minZ) * 0.5;
+        String probeResult = ""
+            + "§d  probes footY=" + footY + ": "
+            + "+X=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx + halfW + probeDistance), footY, net.minecraft.util.Mth.floor(cz)))
+            + " -X=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx - halfW - probeDistance), footY, net.minecraft.util.Mth.floor(cz)))
+            + " +Z=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx), footY, net.minecraft.util.Mth.floor(cz + halfD + probeDistance)))
+            + " -Z=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx), footY, net.minecraft.util.Mth.floor(cz - halfD - probeDistance)));
+        send(source, probeResult);
+        String probeResultM1 = ""
+            + "§d  probes footY-1=" + (footY-1) + ": "
+            + "+X=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx + halfW + probeDistance), footY-1, net.minecraft.util.Mth.floor(cz)))
+            + " -X=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx - halfW - probeDistance), footY-1, net.minecraft.util.Mth.floor(cz)))
+            + " +Z=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx), footY-1, net.minecraft.util.Mth.floor(cz + halfD + probeDistance)))
+            + " -Z=" + isClimbable(source, civet, new BlockPos(net.minecraft.util.Mth.floor(cx), footY-1, net.minecraft.util.Mth.floor(cz - halfD - probeDistance)));
+        send(source, probeResultM1);
+
+        // Block directly below (climbable column check)
+        BlockPos directBelow = new BlockPos(net.minecraft.util.Mth.floor(civet.getX()), footY - 1, net.minecraft.util.Mth.floor(civet.getZ()));
+        boolean belowIsClimbable = source.getLevel().getBlockState(directBelow)
+                .is(com.evirapo.diversityofcritters.misc.tags.DoCTags.Blocks.CIVET_CLIMBABLE);
+        send(source, "§dblockDirectlyBelow climbable=" + belowIsClimbable + " @ " + directBelow);
+
+        // --- NAVIGATION ---
+        Path path = civet.getNavigation().getPath();
+        send(source, "§anav.isDone=" + civet.getNavigation().isDone()
+                + "  canUpdate(sim)=" + (civet.isClimbing() || civet.onGround()));
 
         if (path == null) {
-            send(source, "§cPATH: null — no active path");
+            send(source, "§cPATH: null");
         } else {
             int nodeCount = path.getNodeCount();
             int nextIdx = path.getNextNodeIndex();
-            int currentY = nextIdx > 0 ? path.getNode(nextIdx - 1).y : (int) civet.getY();
+            send(source, "§aPATH: " + nodeCount + " nodes  nextIdx=" + nextIdx
+                    + "  reached=" + path.canReach());
 
-            send(source, "§aPATH: " + nodeCount + " nodes, nextIndex=" + nextIdx
-                    + ", reached=" + path.canReach());
-
-            // Always print all nodes when count is small, for full diagnosis
-            if (nodeCount <= 8) {
-                printAllNodes(source, path);
-            } else {
-                // Print next 6 nodes with dy
-                int limit = Math.min(nextIdx + 6, nodeCount);
-                for (int i = nextIdx; i < limit; i++) {
-                    Node n = path.getNode(i);
-                    int dy = n.y - currentY;
-                    String marker = (i == nextIdx) ? " §e<-- NEXT" : "";
-                    String dyStr = dy > 0 ? "§a▲+" + dy : dy < 0 ? "§c▼" + dy : "§7→0";
-                    send(source, "  §7[" + i + "] (" + n.x + "," + n.y + "," + n.z + ")"
-                            + " type=" + n.type
-                            + " costMalus=" + fmt(n.costMalus)
-                            + " dy=" + dyStr + marker);
-                    currentY = n.y;
-                }
+            // Print all nodes (up to 12)
+            int limit = Math.min(nodeCount, 12);
+            int refY = nodeCount > 0 ? path.getNode(0).y : (int) civet.getY();
+            for (int i = 0; i < limit; i++) {
+                Node n = path.getNode(i);
+                int dy = n.y - refY;
+                String marker = (i == nextIdx) ? " §e<<" : "";
+                String dyStr = dy > 0 ? "§a▲+" + dy : dy < 0 ? "§c▼" + dy : "§7=0";
+                send(source, "  §7[" + i + "] (" + n.x + "," + n.y + "," + n.z
+                        + ") " + dyStr + " t=" + n.type + " m=" + fmt(n.costMalus) + marker);
+                refY = n.y;
             }
-
-            // End node
             Node end = path.getEndNode();
-            if (end != null) {
-                send(source, "§aPATH TARGET: (" + end.x + "," + end.y + "," + end.z + ")");
-            }
+            if (end != null) send(source, "§aTARGET: (" + end.x + "," + end.y + "," + end.z + ")");
         }
 
-        // --- MoveControl state ---
-        // We can't directly read wantedX/Y/Z (private in MoveControl base),
-        // but we can print the navigation's last setWantedPosition indirectly
-        // by reading what the navigation tick just computed.
-        send(source, "§dmoveControl.operation: " + civet.getMoveControl().getClass().getSimpleName());
-
-        // --- Active goal extra info ---
+        // --- GOALS ---
         send(source, "§6Active goals:");
-        civet.goalSelector.getRunningGoals()
-                .limit(5)
-                .forEach(goal -> {
-                    String extra = "";
-                    if (goal.getGoal() instanceof FindFoodBowlGoal ffg) {
-                        BlockPos bp = ffg.getBowlPos();
-                        if (bp != null) {
-                            double dist = Math.sqrt(civet.distanceToSqr(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5));
-                            double followRange = civet.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
-                            extra = " bowlPos=" + bp
-                                    + " dist=" + fmt(dist)
-                                    + " followRange=" + fmt(followRange)
-                                    + (dist > followRange ? " §cOUT_OF_RANGE" : " §aIN_RANGE");
-                        } else {
-                            extra = " bowlPos=null";
-                        }
-                    }
-                    send(source, "  §6- " + goal.getGoal().getClass().getSimpleName() + extra);
-                });
+        civet.goalSelector.getRunningGoals().limit(5).forEach(goal -> {
+            String extra = "";
+            if (goal.getGoal() instanceof FindFoodBowlGoal ffg) {
+                BlockPos bp = ffg.getBowlPos();
+                if (bp != null) {
+                    double dist = Math.sqrt(civet.distanceToSqr(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5));
+                    double fr = civet.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
+                    extra = " bowl=" + bp + " d=" + fmt(dist) + "/" + fmt(fr)
+                            + (dist > fr ? " §cOOB" : " §aOK");
+                } else {
+                    extra = " bowl=null";
+                }
+            }
+            send(source, "  §6- " + goal.getGoal().getClass().getSimpleName() + extra);
+        });
 
         send(source, "§e=== END ===");
         return 1;
     }
 
-    /**
-     * Extra: print full node list when PATH has few nodes, to see the exact
-     * coordinates and confirm whether the target Y is being adjusted.
-     */
-    private static void printAllNodes(CommandSourceStack source, Path path) {
-        int count = path.getNodeCount();
-        send(source, "§7Full node list (" + count + " nodes):");
-        int refY = count > 0 ? path.getNode(0).y : 0;
-        for (int i = 0; i < count; i++) {
-            var n = path.getNode(i);
-            int dy = n.y - refY;
-            String dyStr = dy > 0 ? "§a▲+" + dy : dy < 0 ? "§c▼" + dy : "§7→0";
-            send(source, "  §7[" + i + "] (" + n.x + "," + n.y + "," + n.z + ") dy=" + dyStr
-                    + " type=" + n.type + " malus=" + String.format("%.1f", n.costMalus));
-            refY = n.y;
-        }
+    private static String isClimbable(CommandSourceStack source, CivetEntity civet, BlockPos pos) {
+        boolean c = source.getLevel().getBlockState(pos)
+                .is(com.evirapo.diversityofcritters.misc.tags.DoCTags.Blocks.CIVET_CLIMBABLE);
+        return c ? "§aY" : "§7N";
     }
 
     private static String climbStateName(byte state) {
@@ -173,7 +156,7 @@ public class CivetDebugCommand {
             case 1 -> "UP";
             case 2 -> "DOWN";
             case 3 -> "HANG";
-            default -> "UNKNOWN(" + state + ")";
+            default -> "?(" + state + ")";
         };
     }
 

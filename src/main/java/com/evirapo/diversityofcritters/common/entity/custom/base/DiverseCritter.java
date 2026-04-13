@@ -643,15 +643,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     }
 
     // --- DIET ---
-    public static final boolean DEBUG_BOWL_GOALS = true;
+    public static final boolean DEBUG_BOWL_GOALS = false;
     public abstract CritterDietConfig getDietConfig();
-    public void debugGoalMessage(String goalName, String state) {
-        if (!DEBUG_BOWL_GOALS) return;
-        if (this.level().isClientSide()) return;
-        String base = "[BOWL-GOAL][" + this.getName().getString() + "] " + goalName + " " + state;
-        System.out.println(base);
-        for (Player player : this.level().players()) { if (player.distanceTo(this) < 32.0F) player.displayClientMessage(Component.literal(base), true); }
-    }
+    public void debugGoalMessage(String goalName, String state) {}
 
     @Override
     public boolean canMate(Animal otherAnimal) {
