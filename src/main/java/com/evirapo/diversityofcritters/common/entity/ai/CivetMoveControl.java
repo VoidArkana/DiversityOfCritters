@@ -132,9 +132,8 @@ public class CivetMoveControl extends MoveControl {
         }
 
         // CLIMB_DOWN: path goes down AND already off the ground AND touching wall.
-        // Never activate when onGround=true — that case is handled by the
-        // onTopOfClimbable block below which walks the civet to the edge first.
-        if (dy < 0 && adjacentToWall && !onGround) {
+        // Never activate when onGround=true or during postDescentCooldown.
+        if (dy < 0 && adjacentToWall && !onGround && this.civet.postDescentCooldown <= 0) {
             this.civet.setClimbState(CivetEntity.CLIMB_DOWN);
             return;
         }

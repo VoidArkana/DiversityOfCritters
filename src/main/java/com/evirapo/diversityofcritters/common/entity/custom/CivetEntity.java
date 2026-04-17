@@ -843,13 +843,6 @@ public class CivetEntity extends DiverseCritter {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else if (this.onGround() && !hasClimbable) {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
-            } else if (this.onGround() && hasClimbable) {
-                // On ground next to wall — clear CLIMB_UP, arm descent cooldown
-                com.mojang.logging.LogUtils.getLogger().info(
-                    "[ClimbUP] Clearing CLIMB_UP: onGround=true hasClimbable=true cooldown={} entity={}",
-                    this.postDescentCooldown, this.getId());
-                this.postDescentCooldown = POST_DESCENT_COOLDOWN;
-                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else {
                 this.updateClimbFacingYaw();
                 this.lockClimbRotation();
