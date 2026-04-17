@@ -82,7 +82,9 @@ public class CivetNodeEvaluator extends WalkNodeEvaluator {
     }
 
     private boolean isOpenSpace(BlockPos pos) {
-        return this.level.getBlockState(pos).isAir()
-                || !this.level.getBlockState(pos).isSolid();
+        net.minecraft.world.level.block.state.BlockState state = this.level.getBlockState(pos);
+        // Exclude fluids: water/lava are not valid climbing space.
+        if (!state.getFluidState().isEmpty()) return false;
+        return state.isAir() || !state.isSolid();
     }
 }

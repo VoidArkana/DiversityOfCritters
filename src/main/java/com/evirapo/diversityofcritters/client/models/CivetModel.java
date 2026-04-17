@@ -209,7 +209,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
 		if (this.climbing) {
 			if (this.climbingDown) {
-				// Face toward log with paws against surface, head pointing down
 				poseStack.mulPose(Axis.XP.rotationDegrees(-90));
 				poseStack.mulPose(Axis.YP.rotationDegrees(180));
 				poseStack.translate(0, -0.4f, 0.25f);

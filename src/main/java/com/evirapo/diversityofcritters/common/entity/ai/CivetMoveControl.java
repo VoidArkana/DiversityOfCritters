@@ -121,26 +121,20 @@ public class CivetMoveControl extends MoveControl {
         boolean adjacentToWall = this.civet.hasAdjacentClimbableBlock();
         boolean onGround = this.civet.onGround();
 
-        // CLIMB_UP: moving up AND touching the wall
-        // Blocked during postDescentCooldown to prevent reactivation after landing.
-        if (dy > 0 && adjacentToWall && this.civet.postDescentCooldown <= 0) {
-            com.mojang.logging.LogUtils.getLogger().info(
-                "[MoveCtrl] CLIMB_UP from path dy={} adjWall={} onGround={} cooldown={} entity={}",
-                dy, adjacentToWall, onGround, this.civet.postDescentCooldown, this.civet.getId());
+        // CLIMB_UP: path goes up AND touching wall AND not in post-descent cooldown.
+        if (dy > 0 && adjacentToWall && !this.civet.isInPostDescentCooldown()) {
             this.civet.setClimbState(CivetEntity.CLIMB_UP);
             return;
         }
 
-        // CLIMB_DOWN: path goes down AND already off the ground AND touching wall.
-        // Never activate when onGround=true or during postDescentCooldown.
-        if (dy < 0 && adjacentToWall && !onGround && this.civet.postDescentCooldown <= 0) {
+        // CLIMB_DOWN: path goes down AND off ground AND touching wall AND not in post-descent cooldown.
+        if (dy < 0 && adjacentToWall && !onGround && !this.civet.isInPostDescentCooldown()) {
             this.civet.setClimbState(CivetEntity.CLIMB_DOWN);
             return;
         }
 
         // Special case: civet is onGround ON TOP of a climbable column.
-        // Not active during postDescentCooldown.
-        if (onGround && this.civet.postDescentCooldown <= 0) {
+        if (onGround && !this.civet.isInPostDescentCooldown()) {
             BlockPos below = this.civet.blockPosition().below();
             boolean onTopOfClimbable = this.civet.level()
                     .getBlockState(below).is(DoCTags.Blocks.CIVET_CLIMBABLE);
@@ -176,8 +170,8 @@ public class CivetMoveControl extends MoveControl {
             }
         }
 
-        // Lookahead for upcoming descent (already off ground)
-        if (dy == 0 && adjacentToWall && !onGround) {
+        // Lookahead for upcoming descent (already off ground, not in post-descent cooldown).
+        if (dy == 0 && adjacentToWall && !onGround && !this.civet.isInPostDescentCooldown()) {
             int limit = Math.min(nextIdx + LOOKAHEAD_NODES, path.getNodeCount());
             for (int i = nextIdx + 1; i < limit; i++) {
                 int futureY = path.getNode(i).y;

@@ -130,8 +130,14 @@ public class CivetEntity extends DiverseCritter {
 
     // Cooldown after landing from CLIMB_DOWN to prevent immediate CLIMB_UP reactivation.
     // The entity briefly has onGround=false for 1-2 ticks after landing due to physics bounce.
-    public int postDescentCooldown = 0;
+    // Exposed via getter only — MoveControl reads this to gate CLIMB_UP/DOWN activation.
+    private int postDescentCooldown = 0;
     private static final int POST_DESCENT_COOLDOWN = 20;
+
+    // Per-tick cache of hasAdjacentClimbableBlock() — computed once at the top of
+    // updateClimbState() and reused everywhere in the same tick to avoid redundant
+    // block lookups. Valid only on the server thread during tick().
+    private boolean cachedHasClimbable = false;
 
     public boolean isBeingCleaned = false;
 
@@ -233,15 +239,7 @@ public class CivetEntity extends DiverseCritter {
 
     @Override
     public void tick() {
-        __adjacentCallsThisTick = 0; // reset per-tick counter
-        long __t0 = System.nanoTime();
         super.tick();
-        long __ms = (System.nanoTime() - __t0) / 1_000_000;
-        if (__ms >= 10) {
-            com.mojang.logging.LogUtils.getLogger().warn(
-                "[CivetTick][PERF] tick() took {}ms entity={} onGround={} climbing={} climbState={}",
-                __ms, this.getId(), this.onGround(), this.isClimbing(), this.getClimbState());
-        }
 
         if (!this.level().isClientSide) {
             this.updateClimbState();
@@ -368,7 +366,6 @@ public class CivetEntity extends DiverseCritter {
 
     @Override
     public void aiStep() {
-        long __ai0 = System.nanoTime();
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
 
         if (!stack.isEmpty() && stack.is(DoCTags.Items.MEATS) && !this.isNewborn()) {
@@ -409,17 +406,10 @@ public class CivetEntity extends DiverseCritter {
             }
         }
 
-        long __aiMs = (System.nanoTime() - __ai0) / 1_000_000;
-        if (__aiMs >= 5) {
-            com.mojang.logging.LogUtils.getLogger().warn(
-                "[CivetAI][PERF] aiStep took {}ms entity={} onGround={} climbing={}",
-                __aiMs, this.getId(), this.onGround(), this.isClimbing());
-        }
     }
 
     @Override
     public void customServerAiStep() {
-        long __t = System.nanoTime();
         if (this.getMoveControl().hasWanted()) {
             double d0 = this.getMoveControl().getSpeedModifier();
             this.setPose(Pose.STANDING);
@@ -427,12 +417,6 @@ public class CivetEntity extends DiverseCritter {
         } else {
             this.setPose(Pose.STANDING);
             this.setSprinting(false);
-        }
-        long __ms = (System.nanoTime() - __t) / 1_000_000;
-        if (__ms >= 5) {
-            com.mojang.logging.LogUtils.getLogger().warn(
-                "[CivetAI][PERF] customServerAiStep took {}ms entity={}",
-                __ms, this.getId());
         }
     }
 
@@ -451,7 +435,8 @@ public class CivetEntity extends DiverseCritter {
      */
     @Override
     public int getMaxFallDistance() {
-        return this.hasAdjacentClimbableBlock() ? 16 : super.getMaxFallDistance();
+        // Use cached value when available (server tick), otherwise compute directly.
+        return this.cachedHasClimbable ? 16 : super.getMaxFallDistance();
     }
 
     @Override
@@ -728,12 +713,17 @@ public class CivetEntity extends DiverseCritter {
     public void setClimbState(byte state) {
         byte prev = this.getClimbState();
         this.entityData.set(CLIMB_STATE, state);
-        // Arm cooldown when landing from descent
+        // Arm cooldown when landing from descent.
+        // Do NOT reset when activating CLIMB_UP — the cooldown must survive
+        // the activation cycle to break the post-descent re-climb loop.
         if (prev == CLIMB_DOWN && state == CLIMB_NONE) {
             this.postDescentCooldown = POST_DESCENT_COOLDOWN;
         }
-        // NOTE: do NOT reset postDescentCooldown when activating CLIMB_UP.
-        // The cooldown must survive the activation cycle to break the loop.
+    }
+
+    /** Read-only access for CivetMoveControl to gate climb activation. */
+    public boolean isInPostDescentCooldown() {
+        return this.postDescentCooldown > 0;
     }
     public boolean isClimbing() { return getClimbState() != CLIMB_NONE; }
     public boolean isClimbingUp() { return getClimbState() == CLIMB_UP; }
@@ -743,15 +733,7 @@ public class CivetEntity extends DiverseCritter {
     @Override
     public boolean onClimbable() { return isClimbing(); }
 
-    private int __adjacentCallsThisTick = 0;
-
     public boolean hasAdjacentClimbableBlock() {
-        __adjacentCallsThisTick++;
-        if (__adjacentCallsThisTick > 5 && this.tickCount % 20 == 0) {
-            com.mojang.logging.LogUtils.getLogger().warn(
-                "[CivetTick][PERF] hasAdjacentClimbableBlock called {} times this tick! entity={}",
-                __adjacentCallsThisTick, this.getId());
-        }
         return hasAdjacentClimbableBlockInternal();
     }
 
@@ -818,10 +800,12 @@ public class CivetEntity extends DiverseCritter {
     }
 
     private void updateClimbState() {
-        // Tick down the post-descent cooldown
         if (this.postDescentCooldown > 0) this.postDescentCooldown--;
 
-        boolean hasClimbable = this.hasAdjacentClimbableBlock();
+        // Compute once and cache for the entire tick (reused by getMaxFallDistance
+        // and exposed to MoveControl via hasAdjacentClimbableBlock).
+        this.cachedHasClimbable = this.hasAdjacentClimbableBlockInternal();
+        boolean hasClimbable = this.cachedHasClimbable;
         byte currentState = this.getClimbState();
 
         // --- HANG ---
@@ -863,33 +847,23 @@ public class CivetEntity extends DiverseCritter {
         }
 
         // --- CLIMB_NONE fallback ---
+        // Only activate CLIMB_UP when horizontally blocked against a climbable wall
+        // AND the active path has an ascending node — prevents horizontal goals
+        // (TemptGoal, FindFoodBowlGoal, etc.) from accidentally triggering climbing.
         if (this.postDescentCooldown > 0) return;
         if (!this.horizontalCollision || !hasClimbable) return;
         if (this.isScratching() || this.isNewborn() || this.onGround()) return;
 
-        // Require an ascending path node to confirm this is intentional climbing
         boolean pathGoesUp = false;
         net.minecraft.world.level.pathfinder.Path path = this.navigation.getPath();
-        String pathDebug = "null";
         if (path != null && !path.isDone()) {
             int idx = path.getNextNodeIndex();
             int curY = Mth.floor(this.getY());
             int limit = Math.min(idx + 3, path.getNodeCount());
-            StringBuilder sb = new StringBuilder("nodes[");
             for (int i = idx; i < limit; i++) {
-                int nodeY = path.getNode(i).y;
-                sb.append(nodeY).append(",");
-                if (nodeY > curY) { pathGoesUp = true; break; }
+                if (path.getNode(i).y > curY) { pathGoesUp = true; break; }
             }
-            sb.append("] curY=").append(curY).append(" goesUp=").append(pathGoesUp);
-            pathDebug = sb.toString();
         }
-
-        com.mojang.logging.LogUtils.getLogger().info(
-            "[ClimbFallback] hCol={} hasClimb={} onGround={} cooldown={} pathGoesUp={} path={} entity={}",
-            this.horizontalCollision, hasClimbable, this.onGround(),
-            this.postDescentCooldown, pathGoesUp, pathDebug, this.getId());
-
         if (!pathGoesUp) return;
 
         this.setClimbState(CLIMB_UP);
