@@ -209,11 +209,9 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
 		if (this.climbing) {
 			if (this.climbingDown) {
-				// Descending: rotate +90° so the head points downward along the wall
 				poseStack.mulPose(Axis.XP.rotationDegrees(90));
 				poseStack.translate(0, -0.4f, -0.25f);
 			} else {
-				// Ascending or hanging: rotate -90° so the head points upward
 				poseStack.mulPose(Axis.XP.rotationDegrees(-90));
 				poseStack.translate(0, -0.4f, 0.25f);
 			}

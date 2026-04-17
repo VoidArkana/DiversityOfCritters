@@ -3,8 +3,6 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.level.PathNavigationRegion;
 import net.minecraft.world.level.pathfinder.BlockPathTypes;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
@@ -19,10 +17,9 @@ public class CivetNodeEvaluator extends WalkNodeEvaluator {
 
         BlockPos here = new BlockPos(pNode.x, pNode.y, pNode.z);
 
-        // --- A) CLIMB UP ---
+        // --- A) CLIMB UP: beside wall, space above ---
         if (hasAdjacentClimbable(here) && isOpenSpace(here.above())) {
             Node upNode = getNode(pNode.x, pNode.y + 1, pNode.z);
-            // Only add if not already closed (visited) by A* — prevents cycles
             if (!upNode.closed) {
                 upNode.type = BlockPathTypes.WALKABLE;
                 upNode.costMalus = CLIMB_COST_MALUS;
@@ -32,7 +29,9 @@ public class CivetNodeEvaluator extends WalkNodeEvaluator {
             }
         }
 
-        // --- B) CLIMB DOWN beside wall (one step at a time) ---
+        // --- B) CLIMB DOWN: beside wall, climbable also below (one step) ---
+        // The !closed guard prevents cycles in reconstructPath.
+        // One step only — A* will chain naturally through successive nodes.
         if (hasAdjacentClimbable(here) && isOpenSpace(here.below())
                 && hasAdjacentClimbable(here.below())) {
             Node downNode = getNode(pNode.x, pNode.y - 1, pNode.z);
@@ -45,7 +44,11 @@ public class CivetNodeEvaluator extends WalkNodeEvaluator {
             }
         }
 
-        // --- C) DESCEND FROM TOP OF COLUMN (one step only) ---
+        // --- C) DESCEND FROM TOP: standing ON TOP of a climbable column ---
+        // Block directly below is climbable, nothing adjacent at this Y.
+        // Generate ONE node beside the column face at y-1.
+        // Check all 4 directions and add ALL valid ones (not just first),
+        // so the A* can choose the best direction toward the target.
         if (isClimbable(here.below()) && !hasAdjacentClimbable(here)) {
             for (Direction dir : Direction.Plane.HORIZONTAL) {
                 int faceX = pNode.x + dir.getStepX();
@@ -61,7 +64,6 @@ public class CivetNodeEvaluator extends WalkNodeEvaluator {
                         pOutputArray[count++] = stepNode;
                     }
                 }
-                break;
             }
         }
 

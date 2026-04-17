@@ -25,10 +25,6 @@ public class FindFoodBowlGoal extends Goal {
     private int navigationRetryTimer = 0;
     private static final int NAV_RETRY_INTERVAL = 40;
 
-    // canUse() is called every tick by the goal selector.
-    // The block scan is expensive so we only run it once every N ticks.
-    // We track this with a simple game-time stamp instead of a decrementing
-    // counter so it works correctly regardless of how often canUse is called.
     private long lastScanTime = -999;
     private static final int SCAN_INTERVAL_TICKS = 20;
 
@@ -46,7 +42,6 @@ public class FindFoodBowlGoal extends Goal {
         if (critter.level().isClientSide()) return false;
         if (!critter.isHungry()) return false;
 
-        // Only run the expensive scan once per SCAN_INTERVAL_TICKS
         long now = critter.level().getGameTime();
         if (now - lastScanTime < SCAN_INTERVAL_TICKS) return false;
         lastScanTime = now;
@@ -74,15 +69,9 @@ public class FindFoodBowlGoal extends Goal {
 
     private void navigateToBowl() {
         if (bowlPos == null) return;
-
-        // Only navigate if bowl is within follow range to avoid PathNavigationRegion
-        // spanning unloaded chunks which blocks the server thread.
-        double followRange = critter.getAttributeValue(
-                net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE);
-        double dist = Math.sqrt(critter.distanceToSqr(
-                bowlPos.getX() + 0.5, bowlPos.getY() + 0.5, bowlPos.getZ() + 0.5));
-        if (dist > followRange) return;
-
+        // No distance guard here — the pathfinder itself will return null
+        // if the target is unreachable. The followRange guard was causing
+        // the civeta to never start when the bowl was just outside the range.
         double tx = bowlPos.getX() + 0.5;
         double ty = bowlPos.getY() + 1.0;
         double tz = bowlPos.getZ() + 0.5;

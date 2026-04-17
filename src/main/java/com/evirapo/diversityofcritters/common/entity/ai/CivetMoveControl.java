@@ -2,7 +2,6 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
-import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -10,22 +9,22 @@ import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
-import org.slf4j.Logger;
 
 public class CivetMoveControl extends MoveControl {
     private final CivetEntity civet;
-    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final double CLIMB_SPEED = 0.16D;
     private static final double STEP_UP_IMPULSE = 0.02D;
     private static final double STEP_UP_HORIZONTAL_DAMPING = 0.02D;
     private static final int POST_CLIMB_DAMPING_TICKS = 6;
     private static final double POST_CLIMB_HORIZONTAL_DAMPING = 0.65D;
-    private static final int LOOKAHEAD_NODES = 3;
+    private static final int LOOKAHEAD_NODES = 5;
 
     private boolean wasClimbingLastTick = false;
     private int postClimbDampingTicks = 0;
-    private int logThrottle = 0;
+
+    private int landingCooldown = 0;
+    private static final int LANDING_COOLDOWN_TICKS = 15; // enough to clear residual horizontal velocity
 
     public CivetMoveControl(CivetEntity pMob) {
         super(pMob);
@@ -35,6 +34,18 @@ public class CivetMoveControl extends MoveControl {
     @Override
     public void tick() {
         boolean isClimbingNow = this.civet.isClimbing();
+
+        // Track landing: when we were climbing down and just hit the ground
+        if (this.wasClimbingLastTick && !isClimbingNow && this.civet.onGround()) {
+            this.landingCooldown = LANDING_COOLDOWN_TICKS;
+        }
+        if (this.landingCooldown > 0) {
+            this.landingCooldown--;
+            // Zero out horizontal velocity during landing to prevent
+            // the push-into-wall from triggering CLIMB_UP via horizontalCollision
+            Vec3 motion = this.civet.getDeltaMovement();
+            this.civet.setDeltaMovement(0, motion.y, 0);
+        }
 
         if (isClimbingNow) {
             this.wasClimbingLastTick = true;
@@ -58,7 +69,6 @@ public class CivetMoveControl extends MoveControl {
             this.postClimbDampingTicks--;
         }
 
-        // Always run path analysis, even outside MOVE_TO block
         if (!this.civet.getNavigation().isDone()) {
             updateClimbDirectionFromPath();
         }
@@ -111,59 +121,63 @@ public class CivetMoveControl extends MoveControl {
         boolean adjacentToWall = this.civet.hasAdjacentClimbableBlock();
         boolean onGround = this.civet.onGround();
 
-        BlockPos below = this.civet.blockPosition().below();
-        boolean onTopOfClimbable = onGround
-                && this.civet.level().getBlockState(below).is(DoCTags.Blocks.CIVET_CLIMBABLE);
-
-        // Log every 10 ticks
-        logThrottle++;
-        if (logThrottle >= 10) {
-            logThrottle = 0;
-            LOGGER.info("[MoveCtrl] pos=({},{}) nextNode=({},{},{}) dy={} adjWall={} onGround={} onTopClimb={} op={}",
-                    String.format("%.1f", this.civet.getX()),
-                    String.format("%.1f", this.civet.getY()),
-                    nextNode.x, nextNode.y, nextNode.z,
-                    dy, adjacentToWall, onGround, onTopOfClimbable,
-                    this.operation);
-        }
-
-        // CLIMB_UP
-        if (dy > 0 && adjacentToWall) {
+        // CLIMB_UP: moving up AND touching the wall
+        // Blocked during postDescentCooldown to prevent reactivation after landing.
+        if (dy > 0 && adjacentToWall && this.civet.postDescentCooldown <= 0) {
+            com.mojang.logging.LogUtils.getLogger().info(
+                "[MoveCtrl] CLIMB_UP from path dy={} adjWall={} onGround={} cooldown={} entity={}",
+                dy, adjacentToWall, onGround, this.civet.postDescentCooldown, this.civet.getId());
             this.civet.setClimbState(CivetEntity.CLIMB_UP);
             return;
         }
 
-        // CLIMB_DOWN while on wall (not on ground)
+        // CLIMB_DOWN: path goes down AND already off the ground AND touching wall.
+        // Never activate when onGround=true — that case is handled by the
+        // onTopOfClimbable block below which walks the civet to the edge first.
         if (dy < 0 && adjacentToWall && !onGround) {
             this.civet.setClimbState(CivetEntity.CLIMB_DOWN);
             return;
         }
 
-        // On top of climbable column, path goes down:
-        // walk toward descent node to reach the edge
-        if (onTopOfClimbable) {
-            int limit = Math.min(nextIdx + LOOKAHEAD_NODES + 2, path.getNodeCount());
-            for (int i = nextIdx; i < limit; i++) {
-                if (path.getNode(i).y < currentY) {
-                    Node target = path.getNode(i);
-                    float speed = (float)(this.speedModifier
-                            * this.civet.getAttributeValue(Attributes.MOVEMENT_SPEED));
-                    double tx = target.x + 0.5 - this.civet.getX();
-                    double tz = target.z + 0.5 - this.civet.getZ();
-                    float yaw = (float)(Mth.atan2(tz, tx) * (180.0 / Math.PI)) - 90.0F;
-                    this.civet.setYRot(this.rotlerp(this.civet.getYRot(), yaw, 30.0F));
-                    this.civet.setYBodyRot(this.civet.getYRot());
-                    this.civet.setSpeed(speed);
-                    LOGGER.info("[MoveCtrl] onTopOfClimbable → forcing toward ({},{},{}) speed={}",
-                            target.x, target.y, target.z, String.format("%.3f", speed));
-                    return;
+        // Special case: civet is onGround ON TOP of a climbable column.
+        // Not active during postDescentCooldown.
+        if (onGround && this.civet.postDescentCooldown <= 0) {
+            BlockPos below = this.civet.blockPosition().below();
+            boolean onTopOfClimbable = this.civet.level()
+                    .getBlockState(below).is(DoCTags.Blocks.CIVET_CLIMBABLE);
+
+            if (onTopOfClimbable) {
+                // Scan the full remaining path for any descent node
+                boolean pathHasDescent = false;
+                for (int i = nextIdx; i < path.getNodeCount(); i++) {
+                    if (path.getNode(i).y < currentY) {
+                        pathHasDescent = true;
+                        break;
+                    }
                 }
+
+                if (pathHasDescent) {
+                    // Find the first descent node and walk toward it
+                    for (int i = nextIdx; i < Math.min(nextIdx + LOOKAHEAD_NODES, path.getNodeCount()); i++) {
+                        if (path.getNode(i).y < currentY) {
+                            Node target = path.getNode(i);
+                            float speed = (float)(this.speedModifier
+                                    * this.civet.getAttributeValue(Attributes.MOVEMENT_SPEED));
+                            double tx = target.x + 0.5 - this.civet.getX();
+                            double tz = target.z + 0.5 - this.civet.getZ();
+                            float yaw = (float)(Mth.atan2(tz, tx) * (180.0 / Math.PI)) - 90.0F;
+                            this.civet.setYRot(this.rotlerp(this.civet.getYRot(), yaw, 30.0F));
+                            this.civet.setYBodyRot(this.civet.getYRot());
+                            this.civet.setSpeed(speed);
+                            return;
+                        }
+                    }
+                }
+                // If no descent in full path, fall through to normal movement
             }
-            LOGGER.info("[MoveCtrl] onTopOfClimbable but no descent in lookahead nextIdx={} total={}",
-                    nextIdx, path.getNodeCount());
         }
 
-        // Lookahead descent (off ground)
+        // Lookahead for upcoming descent (already off ground)
         if (dy == 0 && adjacentToWall && !onGround) {
             int limit = Math.min(nextIdx + LOOKAHEAD_NODES, path.getNodeCount());
             for (int i = nextIdx + 1; i < limit; i++) {
@@ -181,11 +195,22 @@ public class CivetMoveControl extends MoveControl {
         float horizontalSpeed = (float)(0.8 * this.civet.getAttributeValue(Attributes.MOVEMENT_SPEED)) * 0.5F;
         this.civet.setSpeed(horizontalSpeed);
         Vec3 motion = this.civet.getDeltaMovement();
+
         if (this.civet.isHanging()) {
             this.civet.setDeltaMovement(motion.x, 0.0D, motion.z);
         } else if (this.civet.isClimbingDown()) {
-            this.civet.setDeltaMovement(motion.x, -CLIMB_SPEED, motion.z);
+            // Push INTO the wall during descent so the hitbox stays flush.
+            // climbFacingYaw is the yaw the entity FACES (outward from wall).
+            // In Minecraft yaw convention: yaw=0 faces +Z, yaw=90 faces -X.
+            // Entity.getLookAngle() uses: x = -sin(yaw), z = cos(yaw)
+            // So the "look" direction (outward) = (-sin(yaw), 0, cos(yaw))
+            // Push INTO wall = opposite = (sin(yaw), 0, -cos(yaw))
+            float yawRad = (float) Math.toRadians(this.civet.getClimbFacingYaw());
+            double pushX = -Math.sin(yawRad) * 0.15;
+            double pushZ = Math.cos(yawRad) * 0.15;
+            this.civet.setDeltaMovement(pushX, -CLIMB_SPEED, pushZ);
         } else {
+            // CLIMB_UP
             this.civet.setDeltaMovement(motion.x, CLIMB_SPEED, motion.z);
         }
     }

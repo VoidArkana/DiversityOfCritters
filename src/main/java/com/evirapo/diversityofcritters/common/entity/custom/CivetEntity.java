@@ -128,10 +128,10 @@ public class CivetEntity extends DiverseCritter {
     private boolean climbRewardArmed = false;
     private int climbRewardCooldown = 0;
 
-    // Ticks to keep CLIMB_DOWN active even if hasAdjacentClimbableBlock
-    // returns false momentarily (e.g. between two log blocks in a column).
-    private int climbDownProtectionTicks = 0;
-    private static final int CLIMB_DOWN_PROTECTION = 8;
+    // Cooldown after landing from CLIMB_DOWN to prevent immediate CLIMB_UP reactivation.
+    // The entity briefly has onGround=false for 1-2 ticks after landing due to physics bounce.
+    public int postDescentCooldown = 0;
+    private static final int POST_DESCENT_COOLDOWN = 20;
 
     public boolean isBeingCleaned = false;
 
@@ -158,7 +158,7 @@ public class CivetEntity extends DiverseCritter {
                 .add(Attributes.MAX_HEALTH, 10.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.2D)
                 .add(Attributes.ATTACK_DAMAGE, 2.0D)
-                .add(Attributes.FOLLOW_RANGE, 6.0D); // Minimal range to keep PathNavigationRegion small and avoid server freeze
+                .add(Attributes.FOLLOW_RANGE, 16.0D); // Standard range — freeze was caused by System.out.println, not pathfinding
     }
 
     protected PathNavigation createNavigation(Level pLevel) {
@@ -726,12 +726,14 @@ public class CivetEntity extends DiverseCritter {
     // --- CLIMB STATE ---
     public byte getClimbState() { return this.entityData.get(CLIMB_STATE); }
     public void setClimbState(byte state) {
+        byte prev = this.getClimbState();
         this.entityData.set(CLIMB_STATE, state);
-        if (state == CLIMB_DOWN) {
-            this.climbDownProtectionTicks = CLIMB_DOWN_PROTECTION;
-        } else if (state == CLIMB_NONE) {
-            this.climbDownProtectionTicks = 0;
+        // Arm cooldown when landing from descent
+        if (prev == CLIMB_DOWN && state == CLIMB_NONE) {
+            this.postDescentCooldown = POST_DESCENT_COOLDOWN;
         }
+        // NOTE: do NOT reset postDescentCooldown when activating CLIMB_UP.
+        // The cooldown must survive the activation cycle to break the loop.
     }
     public boolean isClimbing() { return getClimbState() != CLIMB_NONE; }
     public boolean isClimbingUp() { return getClimbState() == CLIMB_UP; }
@@ -816,6 +818,9 @@ public class CivetEntity extends DiverseCritter {
     }
 
     private void updateClimbState() {
+        // Tick down the post-descent cooldown
+        if (this.postDescentCooldown > 0) this.postDescentCooldown--;
+
         boolean hasClimbable = this.hasAdjacentClimbableBlock();
         byte currentState = this.getClimbState();
 
@@ -838,6 +843,13 @@ public class CivetEntity extends DiverseCritter {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else if (this.onGround() && !hasClimbable) {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+            } else if (this.onGround() && hasClimbable) {
+                // On ground next to wall — clear CLIMB_UP, arm descent cooldown
+                com.mojang.logging.LogUtils.getLogger().info(
+                    "[ClimbUP] Clearing CLIMB_UP: onGround=true hasClimbable=true cooldown={} entity={}",
+                    this.postDescentCooldown, this.getId());
+                this.postDescentCooldown = POST_DESCENT_COOLDOWN;
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else {
                 this.updateClimbFacingYaw();
                 this.lockClimbRotation();
@@ -847,22 +859,10 @@ public class CivetEntity extends DiverseCritter {
 
         // --- CLIMB_DOWN ---
         if (currentState == CLIMB_DOWN) {
-            // Always clear if on the ground, regardless of protection timer
             if (this.onGround()) {
-                this.climbDownProtectionTicks = 0;
-                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+                // Landed — setClimbState will arm postDescentCooldown
+                this.setClimbState(CLIMB_NONE);
                 return;
-            }
-            if (this.climbDownProtectionTicks > 0) {
-                // Grace period: keep climbing even if probe temporarily misses
-                this.climbDownProtectionTicks--;
-                this.updateClimbFacingYaw();
-                this.lockClimbRotation();
-                return;
-            }
-            // Refresh protection ticks whenever we can still detect the wall
-            if (hasClimbable) {
-                this.climbDownProtectionTicks = CLIMB_DOWN_PROTECTION;
             }
             this.updateClimbFacingYaw();
             this.lockClimbRotation();
@@ -870,13 +870,38 @@ public class CivetEntity extends DiverseCritter {
         }
 
         // --- CLIMB_NONE fallback ---
-        // Only activate CLIMB_UP via horizontal collision if we are not
-        // already in a descent path (which is managed by MoveControl).
-        if (this.horizontalCollision && hasClimbable && !this.isScratching() && !this.isNewborn()) {
-            this.setClimbState(CLIMB_UP);
-            this.updateClimbFacingYaw();
-            this.lockClimbRotation();
+        if (this.postDescentCooldown > 0) return;
+        if (!this.horizontalCollision || !hasClimbable) return;
+        if (this.isScratching() || this.isNewborn() || this.onGround()) return;
+
+        // Require an ascending path node to confirm this is intentional climbing
+        boolean pathGoesUp = false;
+        net.minecraft.world.level.pathfinder.Path path = this.navigation.getPath();
+        String pathDebug = "null";
+        if (path != null && !path.isDone()) {
+            int idx = path.getNextNodeIndex();
+            int curY = Mth.floor(this.getY());
+            int limit = Math.min(idx + 3, path.getNodeCount());
+            StringBuilder sb = new StringBuilder("nodes[");
+            for (int i = idx; i < limit; i++) {
+                int nodeY = path.getNode(i).y;
+                sb.append(nodeY).append(",");
+                if (nodeY > curY) { pathGoesUp = true; break; }
+            }
+            sb.append("] curY=").append(curY).append(" goesUp=").append(pathGoesUp);
+            pathDebug = sb.toString();
         }
+
+        com.mojang.logging.LogUtils.getLogger().info(
+            "[ClimbFallback] hCol={} hasClimb={} onGround={} cooldown={} pathGoesUp={} path={} entity={}",
+            this.horizontalCollision, hasClimbable, this.onGround(),
+            this.postDescentCooldown, pathGoesUp, pathDebug, this.getId());
+
+        if (!pathGoesUp) return;
+
+        this.setClimbState(CLIMB_UP);
+        this.updateClimbFacingYaw();
+        this.lockClimbRotation();
     }
 
     private void lockClimbRotation() {
