@@ -6,10 +6,13 @@ import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import net.minecraft.client.animation.AnimationDefinition;
+import net.minecraft.client.animation.KeyframeAnimations;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
+import net.minecraft.world.entity.AnimationState;
 import org.joml.Vector3f;
 
 public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
@@ -156,11 +159,30 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 			this.animate(entity.climbIdleState,    CivetAnims.CLIMB_IDLE,    ageInTicks, 1.0F);
 		} else {
 			if (entity.isInWaterOrBubble()){
-				this.animate(entity.idleAnimationState, CivetAnims.SWIM, ageInTicks, 1.0F);
+				float swimSpeedFactor = 1.0F + limbSwingAmount;
+				this.animate(entity.swimAnimationState, CivetAnims.SWIM, ageInTicks, swimSpeedFactor);
+				this.BandedPlamCivet.y += 4.0F;
+				this.Head.xRot -= 0.3F;
 			} else {
-				this.animateWalk(entity.isSprinting() ? CivetAnims.RUN : CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F);
+				// --- locomoción terrestre con blending ---
+				boolean busyBodyAnim = entity.isScratching() || entity.isCleaning()
+				                   || entity.IsDrinking()    || entity.isDigging()
+				                   || entity.isVariantActive;
 
-				this.animate(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, 1.0F);
+				float moveFraction = Math.min(1.0F, limbSwingAmount * 4.0F);
+				float idleWeight   = busyBodyAnim ? 0.0F : (1.0F - moveFraction) * (1.0F - moveFraction);
+				float sprintWeight = entity.sprintProgress;
+				float walkWeight   = 1.0F - sprintWeight;
+
+				if (idleWeight > 0.01F) {
+					this.animateWithWeight(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, idleWeight);
+				}
+				if (walkWeight > 0.01F) {
+					this.animateWalkWithWeight(CivetAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F, walkWeight);
+				}
+				if (sprintWeight > 0.01F) {
+					this.animateWalkWithWeight(CivetAnims.RUN, limbSwing, limbSwingAmount, 2.0F, 2.5F, sprintWeight);
+				}
 
 				this.animate(entity.idleStandUpState,    CivetAnims.STAND_UP,   ageInTicks, 1.0F);
 				this.animate(entity.idleSniffLeftState,  CivetAnims.SNIFF_LEFT, ageInTicks, 1.0F);
@@ -226,5 +248,24 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	@Override
 	public ModelPart root() {
 		return BandedPlamCivet;
+	}
+
+	// --- Helpers de blending ---
+
+	/** Reproduce una AnimationState escalando la amplitud por {@code weight} (0..1). */
+	private void animateWithWeight(AnimationState state, AnimationDefinition definition,
+	                               float ageInTicks, float weight) {
+		state.updateTime(ageInTicks, 1.0F);
+		state.ifStarted(s -> KeyframeAnimations.animate(
+				this, definition, s.getAccumulatedTime(), weight, ANIMATION_VECTOR_CACHE));
+	}
+
+	/** Versión con peso de {@code animateWalk}: escala la amplitud final por {@code weight}. */
+	private void animateWalkWithWeight(AnimationDefinition definition,
+	                                   float limbSwing, float limbSwingAmount,
+	                                   float speed, float intensity, float weight) {
+		long time       = (long)(limbSwing * 50.0F * speed);
+		float finalScale = Math.min(limbSwingAmount * intensity, 1.0F) * weight;
+		KeyframeAnimations.animate(this, definition, time, finalScale, ANIMATION_VECTOR_CACHE);
 	}
 }

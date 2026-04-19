@@ -82,6 +82,7 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState scratchStartingState = new AnimationState();
     public final AnimationState scratchIdleState     = new AnimationState();
     public final AnimationState scratchEndingState   = new AnimationState();
+    public final AnimationState swimAnimationState   = new AnimationState();
 
     // --- IDLE VARIANTS ENUM ---
     public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
@@ -128,15 +129,15 @@ public class CivetEntity extends DiverseCritter {
     private boolean climbRewardArmed = false;
     private int climbRewardCooldown = 0;
 
-    // Cooldown after landing from CLIMB_DOWN to prevent immediate CLIMB_UP reactivation.
-    // The entity briefly has onGround=false for 1-2 ticks after landing due to physics bounce.
-    // Exposed via getter only — MoveControl reads this to gate CLIMB_UP/DOWN activation.
+    /** Progreso de sprint (0 = walk, 1 = run), interpolado en el cliente. */
+    public float sprintProgress = 0.0F;
+
+    /** True mientras una variante idle (STAND_UP, SNIFF, SIT, LAY) esté activa.
+     *  Expuesto al modelo para suprimir el blend de idle base. */
+    public boolean isVariantActive = false;
+
     private int postDescentCooldown = 0;
     private static final int POST_DESCENT_COOLDOWN = 20;
-
-    // Per-tick cache of hasAdjacentClimbableBlock() — computed once at the top of
-    // updateClimbState() and reused everywhere in the same tick to avoid redundant
-    // block lookups. Valid only on the server thread during tick().
     private boolean cachedHasClimbable = false;
 
     public boolean isBeingCleaned = false;
@@ -164,7 +165,7 @@ public class CivetEntity extends DiverseCritter {
                 .add(Attributes.MAX_HEALTH, 10.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.2D)
                 .add(Attributes.ATTACK_DAMAGE, 2.0D)
-                .add(Attributes.FOLLOW_RANGE, 16.0D); // Standard range — freeze was caused by System.out.println, not pathfinding
+                .add(Attributes.FOLLOW_RANGE, 16.0D);
     }
 
     protected PathNavigation createNavigation(Level pLevel) {
@@ -359,6 +360,13 @@ public class CivetEntity extends DiverseCritter {
             }
             this.prevDiggingClient = currentDigging;
 
+            // Sprint progress: lerp para suavizar la transición walk→run en el modelo
+            if (this.isSprinting()) {
+                this.sprintProgress = Math.min(1.0F, this.sprintProgress + 0.1F);
+            } else {
+                this.sprintProgress = Math.max(0.0F, this.sprintProgress - 0.1F);
+            }
+
             setupAnimationStatesClient();
             handleCryingAnimationClient();
         }
@@ -453,8 +461,6 @@ public class CivetEntity extends DiverseCritter {
         boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
         boolean swimming     = this.isInWaterOrBubble();
         boolean climbing     = this.isClimbing();
-        boolean doingAttack  = this.isAttacking();
-        boolean hasTarget    = this.getTarget() != null;
 
         IdleVariant v = getIdleVariant();
         int ticksActive = this.clientIdleTick;
@@ -512,17 +518,15 @@ public class CivetEntity extends DiverseCritter {
 
         boolean isDigPlaying  = (isDigStarting || isDigIdle || isDigEnding) && !isOrderedSitPlaying;
 
-        boolean softIdle = this.isAlive()
+        // El idle se suprime mientras haya una variante activa (igual que isOrderedSitPlaying).
+        // El PESO en el modelo maneja la visibilidad durante locomoción normal.
+        boolean groundLocomotion = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
-                && !doingAttack && !hasTarget
-                && !isVariantPlaying
-                && !isScratchPlaying
-                && !isCleanPlaying
-                && !isDrinkPlaying
-                && !isDigPlaying
-                && !isOrderedSitPlaying;
+                && !isOrderedSitPlaying && !isVariantPlaying;
 
-        this.idleAnimationState.animateWhen(softIdle, this.tickCount);
+        this.isVariantActive = isVariantPlaying;
+        this.idleAnimationState.animateWhen(groundLocomotion, this.tickCount);
+        this.swimAnimationState.animateWhen(swimming && this.isAlive(), this.tickCount);
 
         this.idleStandUpState.animateWhen(v == IdleVariant.STAND_UP && isVariantPlaying, this.tickCount);
         this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT && isVariantPlaying, this.tickCount);
@@ -853,6 +857,7 @@ public class CivetEntity extends DiverseCritter {
         if (this.postDescentCooldown > 0) return;
         if (!this.horizontalCollision || !hasClimbable) return;
         if (this.isScratching() || this.isNewborn() || this.onGround()) return;
+        if (this.isInWater() || this.isInWaterOrBubble()) return;  // nunca escalar al salir del agua
 
         boolean pathGoesUp = false;
         net.minecraft.world.level.pathfinder.Path path = this.navigation.getPath();

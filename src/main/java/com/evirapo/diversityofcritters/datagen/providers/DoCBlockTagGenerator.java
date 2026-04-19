@@ -23,8 +23,6 @@ public class DoCBlockTagGenerator extends BlockTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider provider) {
         this.tag(DoCTags.Blocks.CIVET_CLIMBABLE)
-                .addTag(BlockTags.DIRT)
-                .addTag(BlockTags.LOGS)
-                .addTag(BlockTags.STONE_ORE_REPLACEABLES);
+                .addTag(BlockTags.LOGS);           // troncos de árbol — superficie natural de escalada
     }
 }

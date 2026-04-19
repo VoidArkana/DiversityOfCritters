@@ -30,8 +30,6 @@ public class CivetNavigation extends WallClimberNavigation {
     @Override
     protected Path createPath(Set<BlockPos> pTargets, int pRegionOffset,
                               boolean pOffsetUpward, int pAccuracy, float pFollowRange) {
-        // Guard: skip pathfinding if target or entity chunks are not loaded.
-        // PathNavigationRegion will block the server thread loading chunks otherwise.
         for (BlockPos target : pTargets) {
             if (!this.level.hasChunk(target.getX() >> 4, target.getZ() >> 4)) return null;
         }

@@ -26,8 +26,6 @@ public class CivetClimbGoal extends Goal {
 
     public CivetClimbGoal(CivetEntity civet, double speed, int searchRadius) {
         this.civet = civet;
-        // speed and searchRadius kept in constructor signature to avoid
-        // changing the registration call in CivetEntity.registerGoals()
         this.setFlags(EnumSet.of(Flag.MOVE));
     }
 
@@ -37,7 +35,6 @@ public class CivetClimbGoal extends Goal {
         if (civet.isSleeping() || civet.isOrderedToSit()) return false;
         if (this.cooldown-- > 0) return false;
 
-        // Only hang if the civet is already climbing (pathfinding put it on a wall)
         return civet.isClimbingUp() && civet.getRandom().nextInt(60) == 0;
     }
 
@@ -57,7 +54,6 @@ public class CivetClimbGoal extends Goal {
 
     @Override
     public void tick() {
-        // Lock in HANG state and zero movement
         if (civet.getClimbState() != CivetEntity.CLIMB_HANG) {
             civet.setClimbState(CivetEntity.CLIMB_HANG);
         }
@@ -70,7 +66,6 @@ public class CivetClimbGoal extends Goal {
         if (civet.isHanging()) {
             civet.setClimbState(CivetEntity.CLIMB_NONE);
         }
-        // Award enrichment for hanging
         civet.setEnrichment(civet.maxEnrichment());
         this.cooldown = COOLDOWN_MIN + civet.getRandom().nextInt(COOLDOWN_MAX - COOLDOWN_MIN);
     }

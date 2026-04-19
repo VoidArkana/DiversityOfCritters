@@ -1,7 +1,5 @@
 {
   "values": [
-    "#minecraft:dirt",
-    "#minecraft:logs",
-    "#minecraft:stone_ore_replaceables"
+    "#minecraft:logs"
   ]
 }
