@@ -825,6 +825,13 @@ public class CivetEntity extends DiverseCritter {
 
         // --- CLIMB_UP ---
         if (currentState == CLIMB_UP) {
+            // Blocked by ceiling: verticalCollision=true AND onGround=false = techo sólido arriba.
+            if (this.verticalCollision && !this.onGround()) {
+                // No puede subir más — cancelar climbing, caer, replanificar ruta.
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+                this.navigation.recomputePath();
+                return;
+            }
             if (!hasClimbable && !this.onGround()) {
                 float yawRad = this.getYRot() * ((float) Math.PI / 180F);
                 this.setDeltaMovement(-Math.sin(yawRad) * 0.25D, 0.4D, Math.cos(yawRad) * 0.25D);
@@ -1008,3 +1015,4 @@ public class CivetEntity extends DiverseCritter {
     }
 
 }
+
