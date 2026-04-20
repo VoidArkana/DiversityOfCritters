@@ -47,30 +47,25 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
-    // --- DATA ACCESSORS ---
     private static final EntityDataAccessor<Boolean> IS_MALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Boolean> IS_JUVENILE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_PREGNANT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> CAN_BREED = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
-    // Stats
     private static final EntityDataAccessor<Integer> HUNGER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> THIRST = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ENRICHMENT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HYGIENE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
 
-    // States
     private static final EntityDataAccessor<Boolean> DRINKING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Optional<BlockPos>> DRINK_POS = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
     private static final EntityDataAccessor<Boolean> CLEANING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> ATTACKING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
-    // Sleep States
     private static final EntityDataAccessor<Integer> SLEEP_STATE_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     protected static final EntityDataAccessor<Boolean> DIURNAL = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
-    // AI States
     protected static final EntityDataAccessor<Boolean> WANDERING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_CRYING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
@@ -113,7 +108,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.setPathfindingMalus(BlockPathTypes.WATER_BORDER, 0.0F);
     }
 
-    // --- CONFIGURATION ---
     public int maxHunger(){ return 100; }
     public int maxThirst(){ return 100; }
     public int maxEnrichment(){ return 100; }
@@ -135,7 +129,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         return prevOrderedSitClient || clientOrderedSitEndingTick > 0;
     }
 
-    // --- SYNC & DATA ---
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
@@ -205,25 +198,20 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
         this.setWandering(pCompound.getBoolean("Wandering"));
 
-        // [FASE 1] Carga de NBT
         if (pCompound.contains("IsPregnant")) this.setPregnant(pCompound.getBoolean("IsPregnant"));
         if (pCompound.contains("CanBreed")) this.setCanBreed(pCompound.getBoolean("CanBreed"));
         if (pCompound.contains("PregnancyTimer")) this.pregnancyTimer = pCompound.getInt("PregnancyTimer");
         if (pCompound.contains("BreedCooldown")) this.breedCooldown = pCompound.getInt("BreedCooldown");
     }
 
-    // --- GETTERS & SETTERS ---
-
     public Boolean getIsMale() { return this.entityData.get(IS_MALE); }
     public void setIsMale(Boolean isMale) { this.entityData.set(IS_MALE, isMale); }
 
-    // [FASE 1] Getters y Setters de Reproducción
     public boolean isPregnant() { return this.entityData.get(IS_PREGNANT); }
     public void setPregnant(boolean pregnant) { this.entityData.set(IS_PREGNANT, pregnant); }
     public boolean canBreed() { return this.entityData.get(CAN_BREED); }
     public void setCanBreed(boolean canBreed) { this.entityData.set(CAN_BREED, canBreed); }
 
-    // Percentages
     public int getHungerPercentage() { return (100 * this.getHunger())/this.maxHunger(); }
     public int getThirstPercentage() { return (100 * this.getThirst())/this.maxThirst(); }
     public int getEnrichmentPercentage() {return (100 * this.getEnrichment()) / this.maxEnrichment();}
@@ -238,7 +226,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public int getHygiene() { return this.entityData.get(HYGIENE); }
     public void setHygiene(int hygiene) { this.entityData.set(HYGIENE, Math.max(0, Math.min(maxHygiene(), hygiene))); }
 
-    // Flags
     public boolean isCleaning() { return this.entityData.get(CLEANING); }
     public void setCleaning(boolean value) { this.entityData.set(CLEANING, value); }
     public boolean hasLowHygiene() { return this.getHygienePercentage() < 50; }
@@ -264,7 +251,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public boolean isCrying() { return this.entityData.get(IS_CRYING); }
     public void setCrying(boolean val) { this.entityData.set(IS_CRYING, val); }
 
-    // Sleep Accessors
     public SleepState getSleepState() { return SleepState.byId(this.entityData.get(SLEEP_STATE_ID)); }
     public void setSleepState(SleepState state) { this.entityData.set(SLEEP_STATE_ID, state.getId()); }
 
@@ -285,8 +271,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     private Integer fixAgeOnFirstTick = null;
 
-    // --- MAIN TICK ---
-    // --- MAIN TICK ---
     @Override
     public void tick() {
         if (!this.level().isClientSide && this.fixAgeOnFirstTick != null) {
@@ -309,7 +293,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 }
             }
 
-            // --- REBALANCEO GLOBAL: Estadísticas 3 veces más lentas (dividiendo entre 60.0 en lugar de 20.0) ---
             if (this.getHunger() > 0) {
                 double lossPerTick = getHungerLossPerSecond() / 60.0;
                 hungerLossAccum += lossPerTick;
@@ -408,7 +391,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
         boolean shouldSit = isOrdered || (inPose && !wandering);
 
-        // --- CONTADOR DINÁMICO DE SIT POR ORDEN ---
         if (shouldSit && !prevOrderedSitClient) {
             this.clientOrderedSitTick = 0;
             this.clientOrderedSitEndingTick = 0;
@@ -427,7 +409,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
         this.prevOrderedSitClient = shouldSit;
 
-        // --- MÁQUINA DE ESTADOS ---
         boolean isStarting = shouldSit && this.clientOrderedSitTick <= getOrderedSitStartingDuration();
         boolean isIdle     = shouldSit && this.clientOrderedSitTick > getOrderedSitStartingDuration();
         boolean isEnding   = !shouldSit && this.clientOrderedSitEndingTick > 0;
@@ -445,7 +426,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     protected void starve() { this.hurt(level().damageSources().starve(), 1); }
 
-    // --- CONTROLS ---
     public class CritterLookControl extends LookControl {
         public CritterLookControl() { super(DiverseCritter.this); }
         @Override public void tick() { if (DiverseCritter.this.getSleepState() == SleepState.AWAKE) super.tick(); }
@@ -456,7 +436,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         public void tick() { if (DiverseCritter.this.canMove()) super.tick(); }
     }
 
-    // --- INVENTORY ---
     private boolean inventoryOpen;
     private DiverseInventory inventory;
     private void createInventory() {
@@ -482,7 +461,6 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public void closeInventory() { this.inventoryOpen = false; }
     @Override public void containerChanged(Container pContainer) {}
 
-    // --- LOGIC ---
     public boolean isThirsty() { return getThirst() <= (int)(maxThirst() * 0.5f); }
     public boolean isHungry() { return getHunger() <= (int)(maxHunger() * 0.5f); }
     public boolean isEnrichmentNeeded() { return getEnrichment() <= (int)(maxEnrichment() * 0.5f); }

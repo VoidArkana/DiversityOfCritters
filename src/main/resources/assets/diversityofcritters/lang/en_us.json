@@ -1,6 +1,6 @@
 {
-  "creativetab.docentities_tab" : "DOC: Living",
-  "creativetab.docitems_tab" : "DOC: Items",
+"creativetab.docentities_tab" : "DOL: Living",
+  "creativetab.docitems_tab" : "DOL: Items",
 
   "entity.diversityofcritters.lion" : "Lion",
   "item.diversityofcritters.lion_spawn_egg" : "Lion Spawn Egg",

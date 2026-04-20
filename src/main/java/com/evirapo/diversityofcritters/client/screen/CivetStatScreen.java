@@ -88,20 +88,17 @@ public class CivetStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
     private static final int GENDER_ICON_HEIGHT = 15;
     private static final float GENDER_ICON_SCALE = 1.0f;
 
-    // Movido más abajo y 20 pixeles a la derecha respecto al de género
     private static final int PREGNANCY_ICON_X = GENDER_ICON_X + 10;
     private static final int PREGNANCY_ICON_Y = GENDER_ICON_Y + 15;
     private static final int PREGNANCY_ICON_WIDTH = 30;
     private static final int PREGNANCY_ICON_HEIGHT = 15;
     private static final float PREGNANCY_ICON_SCALE = 1.0f;
 
-    // ===== Variables internas =====
     private final DiverseCritter entity;
     private ImageButton sunBtn;
     private ImageButton moonBtn;
     private ImageButton releaseBtn;
 
-    // Botón único de Píldora
     private ImageButton pillBtn;
 
     public CivetStatScreen(DOCStatsMenu container, Inventory inventory, DiverseCritter critter) {

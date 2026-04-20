@@ -38,7 +38,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -52,7 +51,6 @@ import java.util.function.Predicate;
 
 public class CivetEntity extends DiverseCritter {
 
-    // --- ANIMATION STATES ---
     public final AnimationState idleAnimationState = new AnimationState();
     public final AnimationState idleStandUpState   = new AnimationState();
     public final AnimationState idleSniffLeftState = new AnimationState();
@@ -84,13 +82,10 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState scratchEndingState   = new AnimationState();
     public final AnimationState swimAnimationState   = new AnimationState();
 
-    // --- IDLE VARIANTS ENUM ---
     public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
 
-    // --- DATA ---
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
 
-    // Climb state: 0=NONE, 1=UP, 2=DOWN
     private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Float> CLIMB_FACING_YAW = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> IS_DIGGING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
@@ -710,22 +705,21 @@ public class CivetEntity extends DiverseCritter {
     @Override public int maxHygiene() { return 4000; }
     @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 25;}
     @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
-    @Override protected boolean getDefaultDiurnal() { return true; }
+    @Override protected boolean getDefaultDiurnal() { return false; }
+    @Override protected double getHungerLossPerSecond()     { return 3.33; }
+    @Override protected double getThirstLossPerSecond()     { return 5.0;  }
+    @Override protected double getEnrichmentLossPerSecond() { return 2.5;  }
+    @Override protected double getHygieneLossPerSecond()    { return 1.5;  }
 
-    // --- CLIMB STATE ---
     public byte getClimbState() { return this.entityData.get(CLIMB_STATE); }
     public void setClimbState(byte state) {
         byte prev = this.getClimbState();
         this.entityData.set(CLIMB_STATE, state);
-        // Arm cooldown when landing from descent.
-        // Do NOT reset when activating CLIMB_UP — the cooldown must survive
-        // the activation cycle to break the post-descent re-climb loop.
         if (prev == CLIMB_DOWN && state == CLIMB_NONE) {
             this.postDescentCooldown = POST_DESCENT_COOLDOWN;
         }
     }
 
-    /** Read-only access for CivetMoveControl to gate climb activation. */
     public boolean isInPostDescentCooldown() {
         return this.postDescentCooldown > 0;
     }
@@ -760,9 +754,6 @@ public class CivetEntity extends DiverseCritter {
         };
 
         for (int[] off : offsets) {
-            // Check at foot level, eye level, and one below foot
-            // (needed when the mob is in the step-off position beside a column
-            // whose climbable blocks are one block below the mob's feet)
             for (int dy : new int[]{0, -1}) {
                 BlockPos posFoot = new BlockPos(off[0], footY + dy, off[1]);
                 BlockPos posEye  = new BlockPos(off[0], eyeY  + dy, off[1]);
@@ -806,13 +797,10 @@ public class CivetEntity extends DiverseCritter {
     private void updateClimbState() {
         if (this.postDescentCooldown > 0) this.postDescentCooldown--;
 
-        // Compute once and cache for the entire tick (reused by getMaxFallDistance
-        // and exposed to MoveControl via hasAdjacentClimbableBlock).
         this.cachedHasClimbable = this.hasAdjacentClimbableBlockInternal();
         boolean hasClimbable = this.cachedHasClimbable;
         byte currentState = this.getClimbState();
 
-        // --- HANG ---
         if (currentState == CLIMB_HANG) {
             if (!hasClimbable) {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
@@ -823,11 +811,8 @@ public class CivetEntity extends DiverseCritter {
             return;
         }
 
-        // --- CLIMB_UP ---
         if (currentState == CLIMB_UP) {
-            // Blocked by ceiling: verticalCollision=true AND onGround=false = techo sólido arriba.
             if (this.verticalCollision && !this.onGround()) {
-                // No puede subir más — cancelar climbing, caer, replanificar ruta.
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
                 this.navigation.recomputePath();
                 return;
@@ -845,10 +830,8 @@ public class CivetEntity extends DiverseCritter {
             return;
         }
 
-        // --- CLIMB_DOWN ---
         if (currentState == CLIMB_DOWN) {
             if (this.onGround()) {
-                // Landed — setClimbState will arm postDescentCooldown
                 this.setClimbState(CLIMB_NONE);
                 return;
             }
@@ -857,14 +840,10 @@ public class CivetEntity extends DiverseCritter {
             return;
         }
 
-        // --- CLIMB_NONE fallback ---
-        // Only activate CLIMB_UP when horizontally blocked against a climbable wall
-        // AND the active path has an ascending node — prevents horizontal goals
-        // (TemptGoal, FindFoodBowlGoal, etc.) from accidentally triggering climbing.
         if (this.postDescentCooldown > 0) return;
         if (!this.horizontalCollision || !hasClimbable) return;
         if (this.isScratching() || this.isNewborn() || this.onGround()) return;
-        if (this.isInWater() || this.isInWaterOrBubble()) return;  // nunca escalar al salir del agua
+        if (this.isInWater() || this.isInWaterOrBubble()) return;
 
         boolean pathGoesUp = false;
         net.minecraft.world.level.pathfinder.Path path = this.navigation.getPath();

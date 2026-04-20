@@ -17,7 +17,7 @@ public class DOCEntitiesCreativeTab {
 
     public static final RegistryObject<CreativeModeTab> DOC_ENTITIES_TAB =
             CREATIVE_MODE_TABS.register("docentities_tab", ()-> CreativeModeTab.builder()
-                    .icon(() -> new ItemStack(DOCItems.ENTITY_TAB_ICON.get()))
+                    .icon(() -> new ItemStack(DOCItems.WORM.get()))
                     .title(Component.translatable("creativetab.docentities_tab"))
                     .displayItems((itemDisplayParameters, output) -> {
 

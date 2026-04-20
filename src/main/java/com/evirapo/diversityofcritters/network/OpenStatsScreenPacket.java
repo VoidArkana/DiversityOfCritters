@@ -2,7 +2,6 @@ package com.evirapo.diversityofcritters.network;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.client.screen.CivetStatScreen;
-import com.evirapo.diversityofcritters.client.screen.DOCStatScreen;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.client.Minecraft;
@@ -40,10 +39,7 @@ public record OpenStatsScreenPacket (int containerId, int entityId) {
                         localplayer.containerMenu = menu;
                         if (critter instanceof CivetEntity) {
                             Minecraft.getInstance().setScreen(new CivetStatScreen(menu, localplayer.getInventory(), critter));
-                        } else {
-                            Minecraft.getInstance().setScreen(new DOCStatScreen(menu, localplayer.getInventory(), critter));
-                        }
-                    }
+                        }                    }
                 }
             });
             context.get().setPacketHandled(true);
